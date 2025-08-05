@@ -3,6 +3,9 @@ import './App.css';
 import { BrowserRouter as Router, Routes, Route } from 'react-router-dom';
 import NotFound from './Pages/NotFound';
 import {NavigationBar} from './Components/NavigationBar';
+import Footer from './Components/Footer';
+import Header from './Components/Header';
+import Landing from './Pages/Landing';
  
 
 function App() {
@@ -12,6 +15,9 @@ function App() {
         <Routes>
           <Route path="/" element={<NavigationBar />} />
           <Route path="/notfound" element={<NotFound />} />
+          <Route path="/footer" element={<Footer />} />
+          <Route path="/header" element={<Header />} />
+          <Route path="/landing" element={<Landing />} />
         </Routes>
       </Router>
     </div>
