@@ -14,22 +14,21 @@ namespace SwiftDeploy.Controllers
     {
         [HttpGet("github/login")]
         public IActionResult GitHubLogin()
+        { 
+           return Challenge(new AuthenticationProperties { RedirectUri = "http://localhost:5173/" }, "GitHub");
+        }
+
+        [HttpGet("github/callback")]
+        public async Task<IActionResult> GitHubCallback()
         {
-           return Challenge(new AuthenticationProperties { RedirectUri = "/" }, "GitHub");
-        }
+           var result = await HttpContext.AuthenticateAsync();
+           var accessToken = await HttpContext.GetTokenAsync("access_token");
 
-            [HttpGet("github/callback")]
-            public async Task<IActionResult> GitHubCallback()
-            {
-                var result = await HttpContext.AuthenticateAsync();
-                var accessToken = await HttpContext.GetTokenAsync("access_token");
-
-                return Ok(new
-                {
-                    token = accessToken,
-                    username = result.Principal.Identity.Name
-                });
-            }
+           return Ok(new
+           {
+                token = accessToken,
+                username = result.Principal.Identity.Name
+           });
         }
-    
+    }   
 }
