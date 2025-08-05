@@ -15,7 +15,7 @@ namespace SwiftDeploy.Controllers
         [HttpGet("github/login")]
         public IActionResult GitHubLogin()
         { 
-           return Challenge(new AuthenticationProperties { RedirectUri = "" }, "GitHub");
+           return Challenge(new AuthenticationProperties { RedirectUri = "http://localhost:5173/" }, "GitHub");
         }
 
         [HttpGet("github/callback")]
