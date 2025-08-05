@@ -1,8 +1,24 @@
 [
   {
-    "ContainingType": "SwiftDeploy.Controllers.AuthController",
+    "ContainingType": "AuthController",
     "Method": "GitHubCallback",
     "RelativePath": "api/Auth/github/callback",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "code",
+        "Type": "System.String",
+        "IsRequired": false
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "AuthController",
+    "Method": "GitHubRedirect",
+    "RelativePath": "api/Auth/github/redirect",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
@@ -10,9 +26,9 @@
     "ReturnTypes": []
   },
   {
-    "ContainingType": "SwiftDeploy.Controllers.AuthController",
-    "Method": "GitHubLogin",
-    "RelativePath": "api/Auth/github/login",
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "GetRepositories",
+    "RelativePath": "api/Repositories",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,

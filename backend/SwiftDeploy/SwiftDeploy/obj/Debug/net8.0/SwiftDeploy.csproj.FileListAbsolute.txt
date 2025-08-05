@@ -31,3 +31,4 @@ D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\re
 D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.pdb
 D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.genruntimeconfig.cache
 D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\ref\SwiftDeploy.dll
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Octokit.dll
