@@ -6,13 +6,13 @@ import { PiGitForkLight } from "react-icons/pi";
 import { GoQuestion } from "react-icons/go";
 import { FiLogOut } from "react-icons/fi";
 
-import "../css/style.css";
+import "../css/NavigationBar.css";
 
 export const NavigationBar = () => {
   return (
     <div className="background">
       <div className="margin mt-4">
-        <img src="/logo.ico" alt="Logo" height={"74px"} width={"84px"} />
+        <img src="/logo.ico" alt="Logo" className="logo" />
         <div className="container">
           <div className="top-icons">
             <div className="iconify-icon mb-4"><MdOutlineDashboard /></div>
