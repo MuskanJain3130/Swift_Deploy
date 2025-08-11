@@ -1,20 +1,24 @@
 {
   "format": 1,
   "restore": {
-    "D:\\Sem 7 project\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj": {}
+    "D:\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj": {}
   },
   "projects": {
-    "D:\\Sem 7 project\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj": {
+    "D:\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj": {
       "version": "1.0.0",
       "restore": {
-        "projectUniqueName": "D:\\Sem 7 project\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj",
+        "projectUniqueName": "D:\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj",
         "projectName": "SwiftDeploy",
-        "projectPath": "D:\\Sem 7 project\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj",
-        "packagesPath": "C:\\Users\\Muskan\\.nuget\\packages\\",
-        "outputPath": "D:\\Sem 7 project\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\obj\\",
+        "projectPath": "D:\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj",
+        "packagesPath": "C:\\Users\\taman\\.nuget\\packages\\",
+        "outputPath": "D:\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\obj\\",
         "projectStyle": "PackageReference",
+        "fallbackFolders": [
+          "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
+        ],
         "configFilePaths": [
-          "C:\\Users\\Muskan\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Users\\taman\\AppData\\Roaming\\NuGet\\NuGet.Config",
+          "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
           "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
         ],
         "originalTargetFrameworks": [
@@ -39,12 +43,17 @@
           "enableAudit": "true",
           "auditLevel": "low",
           "auditMode": "direct"
-        }
+        },
+        "SdkAnalysisLevel": "9.0.300"
       },
       "frameworks": {
         "net8.0": {
           "targetAlias": "net8.0",
           "dependencies": {
+            "Microsoft.AspNetCore.Authentication.JwtBearer": {
+              "target": "Package",
+              "version": "[8.0.19, )"
+            },
             "Microsoft.VisualStudio.Azure.Containers.Tools.Targets": {
               "target": "Package",
               "version": "[1.19.6, )"
@@ -77,7 +86,7 @@
               "privateAssets": "all"
             }
           },
-          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.200/PortableRuntimeIdentifierGraph.json"
+          "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.304/PortableRuntimeIdentifierGraph.json"
         }
       }
     }

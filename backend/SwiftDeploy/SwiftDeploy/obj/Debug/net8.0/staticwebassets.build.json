@@ -1,11 +1,12 @@
 {
   "Version": 1,
-  "Hash": "yM0fVgdVGxF0fakac3bGh37VOZl/dq/ZZuYpEFZJjKQ=",
+  "Hash": "zBw+ZTG8uU8YTbj5Xk24L1AEmi2QkGfkWXubZOP/Mns=",
   "Source": "SwiftDeploy",
   "BasePath": "_content/SwiftDeploy",
   "Mode": "Default",
   "ManifestType": "Build",
   "ReferencedProjectsConfiguration": [],
   "DiscoveryPatterns": [],
-  "Assets": []
+  "Assets": [],
+  "Endpoints": []
 }
