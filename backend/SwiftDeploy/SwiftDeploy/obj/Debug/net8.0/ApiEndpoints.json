@@ -52,8 +52,29 @@
   },
   {
     "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
-    "Method": "GetRepositoryContents",
-    "RelativePath": "api/Repositories/{owner}/{repoName}/contents/{path}",
+    "Method": "GetRootContents",
+    "RelativePath": "api/Repositories/contents/{owner}/{repoName}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "owner",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "repoName",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "GetContentsByPath",
+    "RelativePath": "api/Repositories/contents/{owner}/{repoName}/{path}",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,
@@ -78,8 +99,8 @@
   },
   {
     "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
-    "Method": "GetRepositoryFileContent",
-    "RelativePath": "api/Repositories/{owner}/{repoName}/file/{path}",
+    "Method": "GetFileContent",
+    "RelativePath": "api/Repositories/file/{owner}/{repoName}/{path}",
     "HttpMethod": "GET",
     "IsController": true,
     "Order": 0,

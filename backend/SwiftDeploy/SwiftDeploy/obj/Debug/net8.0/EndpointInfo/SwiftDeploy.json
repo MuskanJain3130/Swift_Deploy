@@ -71,7 +71,37 @@
         }
       }
     },
-    "/api/Repositories/{owner}/{repoName}/contents/{path}": {
+    "/api/Repositories/contents/{owner}/{repoName}": {
+      "get": {
+        "tags": [
+          "Repositories"
+        ],
+        "parameters": [
+          {
+            "name": "owner",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          },
+          {
+            "name": "repoName",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Repositories/contents/{owner}/{repoName}/{path}": {
       "get": {
         "tags": [
           "Repositories"
@@ -109,7 +139,7 @@
         }
       }
     },
-    "/api/Repositories/{owner}/{repoName}/file/{path}": {
+    "/api/Repositories/file/{owner}/{repoName}/{path}": {
       "get": {
         "tags": [
           "Repositories"
