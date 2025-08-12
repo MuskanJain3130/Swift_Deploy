@@ -5,7 +5,7 @@ function NotFound() {
   const navigate = useNavigate();
   const handleHome = () => {navigate("/");};
   return (
-    <div className="background d-flex justify-content-center align-items-center">
+    <div className="background d-flex justify-content-center align-items-center w-100 h-100">
       <div className="overlay-border rounded-3 w-50 h-50 py-5">
         <span className="display-1 fw-bold text-center text-white" >
           404

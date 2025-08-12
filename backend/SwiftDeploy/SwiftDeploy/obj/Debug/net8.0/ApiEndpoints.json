@@ -20,6 +20,110 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "GetRepositories",
+    "RelativePath": "api/Repositories",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "GetRepository",
+    "RelativePath": "api/Repositories/{owner}/{repoName}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "owner",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "repoName",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "GetRootContents",
+    "RelativePath": "api/Repositories/contents/{owner}/{repoName}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "owner",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "repoName",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "GetContentsByPath",
+    "RelativePath": "api/Repositories/contents/{owner}/{repoName}/{path}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "owner",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "repoName",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "path",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "GetFileContent",
+    "RelativePath": "api/Repositories/file/{owner}/{repoName}/{path}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "owner",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "repoName",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "path",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "SwiftDeploy.Controllers.WeatherForecastController",
     "Method": "Get",
     "RelativePath": "WeatherForecast",
@@ -37,6 +141,7 @@
         ],
         "StatusCode": 200
       }
-    ]
+    ],
+    "EndpointName": "GetWeatherForecast"
   }
 ]
