@@ -1,10 +1,10 @@
 import React from "react";
 import "../css/Header.css";
 import { FaGithub } from "react-icons/fa";
-import { useNavigate } from "react-router-dom";
+// import { useNavigate } from "react-router-dom";
 
 const Header = () => {
-  const navigate= useNavigate();
+  // const navigate= useNavigate();
   const handleLogin=()=>{
     window.location.href = "http://localhost:5280/api/auth/github/login";
   }
