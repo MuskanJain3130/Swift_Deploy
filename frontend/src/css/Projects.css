@@ -1,0 +1,94 @@
+:root {
+  /* Global variables for consistency */
+  --content-padding: 2rem; /* 32px equivalent */
+}
+
+/* Make page content sit beside the fixed nav */
+.projects-page {
+  display: flex;
+  min-height: 100vh;
+  background: #19102a;
+}
+
+/* Main content area */
+.projects-main {
+  flex: 1;
+  margin-left: var(--sidebar-width); /* Start after navbar */
+  padding: var(--content-padding);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Heading row */
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.75rem; /* ~28px */
+}
+
+.header-row h2 {
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+/* New Project button */
+.new-project-btn {
+  background: #8462fc;
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem; /* 8px */
+  padding: 0.625rem 1.375rem; /* 10px 22px */
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.new-project-btn:hover {
+  background: #6a4bd6;
+}
+
+/* Grid layout for project cards */
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); /* ~320px */
+  gap: 1.5rem; /* 24px */
+}
+
+/* Individual project card */
+.project-card {
+  background: #2b1858;
+  border-radius: 1rem; /* 16px */
+  box-shadow: 0 0 0.5rem #1b073b30;
+  padding: 1.375rem 1.25rem 1.125rem 1.25rem; /* 22px, 20px, 18px  */
+  display: flex;
+  flex-direction: column;
+}
+
+.project-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem; /* ~5px */
+}
+
+.project-desc {
+  color: #d1caf6;
+  font-size: 1rem;
+  margin-bottom: 0.625rem; /* 10px */
+}
+
+/* Footer row inside card */
+.project-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #bba6ff;
+  font-size: 0.98rem;
+}
+
+/* Responsive adjustments */
+@media (max-width: 50rem) { /* 800px */
+  .projects-grid {
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); /* ~256px */
+  }
+}

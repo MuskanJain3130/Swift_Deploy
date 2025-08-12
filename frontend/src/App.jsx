@@ -7,6 +7,7 @@ import {NavigationBar} from './Components/NavigationBar';
 import Footer from './Components/Footer';
 import Header from './Components/Header';
 import Landing from './Pages/Landing';
+import Projects from './Pages/Projects';
  
 
 function App() {
@@ -20,6 +21,8 @@ function App() {
           <Route path="/header" element={<Header />} />
           <Route path="/landing" element={<Landing />} />
           <Route path="/logs" element={<Logs />} />
+          <Route path="/projects" element={<Projects />} />
+
         </Routes>
       </Router>
     </div>
