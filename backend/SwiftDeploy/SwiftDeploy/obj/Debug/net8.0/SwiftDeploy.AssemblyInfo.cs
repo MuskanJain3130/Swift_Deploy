@@ -15,7 +15,7 @@ using System.Reflection;
 [assembly: System.Reflection.AssemblyCompanyAttribute("SwiftDeploy")]
 [assembly: System.Reflection.AssemblyConfigurationAttribute("Debug")]
 [assembly: System.Reflection.AssemblyFileVersionAttribute("1.0.0.0")]
-[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+60fdda88dc39161b4c444e3d43be69bc14e9bce2")]
+[assembly: System.Reflection.AssemblyInformationalVersionAttribute("1.0.0+22f8c553864b5b4fa5936de5fc3a155d1bdbdd4c")]
 [assembly: System.Reflection.AssemblyProductAttribute("SwiftDeploy")]
 [assembly: System.Reflection.AssemblyTitleAttribute("SwiftDeploy")]
 [assembly: System.Reflection.AssemblyVersionAttribute("1.0.0.0")]
