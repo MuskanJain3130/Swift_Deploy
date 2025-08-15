@@ -20,6 +20,117 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "SwiftDeploy.Controllers.DeploymentsController",
+    "Method": "CreateDeployment",
+    "RelativePath": "api/Deployments",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "body",
+        "Type": "System.Collections.Generic.Dictionary\u00602[[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Object, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.DeploymentsController",
+    "Method": "GetAllDeployments",
+    "RelativePath": "api/Deployments",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.DeploymentsController",
+    "Method": "GetDeploymentById",
+    "RelativePath": "api/Deployments/{id}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.DeploymentsController",
+    "Method": "DeleteDeployment",
+    "RelativePath": "api/Deployments/{id}",
+    "HttpMethod": "DELETE",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.DeploymentsController",
+    "Method": "UpdateDeploymentStatus",
+    "RelativePath": "api/Deployments/{id}/status",
+    "HttpMethod": "PUT",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "id",
+        "Type": "System.String",
+        "IsRequired": true
+      },
+      {
+        "Name": "status",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.LogsController",
+    "Method": "AddLog",
+    "RelativePath": "api/Logs",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "log",
+        "Type": "Microsoft.IdentityModel.Abstractions.LogEntry",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.LogsController",
+    "Method": "GetDeploymentLogs",
+    "RelativePath": "api/Logs/{deploymentId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "deploymentId",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
     "Method": "GetRepositories",
     "RelativePath": "api/Repositories",
@@ -44,6 +155,22 @@
       },
       {
         "Name": "repoName",
+        "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "GetDeploymentsByRepo",
+    "RelativePath": "api/Repositories/{repoId}",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "repoId",
         "Type": "System.String",
         "IsRequired": true
       }
@@ -118,6 +245,48 @@
       {
         "Name": "path",
         "Type": "System.String",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "SaveRepository",
+    "RelativePath": "api/Repositories/save",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "body",
+        "Type": "System.Collections.Generic.Dictionary\u00602[[System.String, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e],[System.Object, System.Private.CoreLib, Version=8.0.0.0, Culture=neutral, PublicKeyToken=7cec85d7bea7798e]]",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
+    "Method": "GetSavedRepositories",
+    "RelativePath": "api/Repositories/saved",
+    "HttpMethod": "GET",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [],
+    "ReturnTypes": []
+  },
+  {
+    "ContainingType": "SwiftDeploy.Controllers.UserController",
+    "Method": "CreateUser",
+    "RelativePath": "api/User",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "user",
+        "Type": "Octokit.User",
         "IsRequired": true
       }
     ],

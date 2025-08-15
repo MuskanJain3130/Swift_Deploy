@@ -1,8 +1,11 @@
 ﻿using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
 using Octokit;
+using SwiftDeploy.Services;
 using System.Linq;
 using System.Threading.Tasks;
+using SwiftDeploy.Models;
 
 namespace SwiftDeploy.Controllers
 {
@@ -11,10 +14,12 @@ namespace SwiftDeploy.Controllers
     public class RepositoriesController : ControllerBase
     {
         private readonly GitHubClient _githubClient;
+        private readonly MongoDbService _mongo;
 
-        public RepositoriesController()
+        public RepositoriesController(MongoDbService mongo)
         {
             _githubClient = new GitHubClient(new ProductHeaderValue("SwiftDeployApp"));
+            _mongo = mongo;
         }
 
         /// <summary>
@@ -176,6 +181,39 @@ namespace SwiftDeploy.Controllers
                 Console.WriteLine($"Error fetching file content for '{path}': {ex.Message}");
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
+        }
+    
+        
+        [HttpPost("save")]
+        public IActionResult SaveRepository([FromBody] Dictionary<string, object> body)
+        {
+            if (body == null)
+                return BadRequest("Repository data is required");
+
+            var repo = new Repository
+            {
+                RepoName = body.ContainsKey("repoName") ? body["repoName"].ToString() : null,
+                RepoUrl = body.ContainsKey("repoUrl") ? body["repoUrl"].ToString() : null,
+                Branch = body.ContainsKey("branch") ? body["branch"].ToString() : "main",
+                UserId = body.ContainsKey("userId") ? body["userId"].ToString() : null,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _mongo.Repositories.InsertOne(repo);
+            return Ok(new { message = "Repository saved", repo });
+        }
+
+        [HttpGet("saved")]
+        public IActionResult GetSavedRepositories()
+        {
+            var repos = _mongo.Repositories.Find(_ => true).ToList();
+            return Ok(repos);
+        }
+        [HttpGet("{repoId}")]
+        public IActionResult GetDeploymentsByRepo(string repoId)
+        {
+            var repositories = _mongo.Repositories.Find(r => r.Id == repoId).ToList();
+            return Ok(repositories);
         }
     }
 }

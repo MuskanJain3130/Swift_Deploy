@@ -29,6 +29,186 @@
         }
       }
     },
+    "/api/Deployments": {
+      "post": {
+        "tags": [
+          "Deployments"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": { }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": { }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": { }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "get": {
+        "tags": [
+          "Deployments"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Deployments/{id}": {
+      "get": {
+        "tags": [
+          "Deployments"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      },
+      "delete": {
+        "tags": [
+          "Deployments"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Deployments/{id}/status": {
+      "put": {
+        "tags": [
+          "Deployments"
+        ],
+        "parameters": [
+          {
+            "name": "id",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "string"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "string"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Logs": {
+      "post": {
+        "tags": [
+          "Logs"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogEntry"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogEntry"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/LogEntry"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Logs/{deploymentId}": {
+      "get": {
+        "tags": [
+          "Logs"
+        ],
+        "parameters": [
+          {
+            "name": "deploymentId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
     "/api/Repositories": {
       "get": {
         "tags": [
@@ -177,6 +357,105 @@
         }
       }
     },
+    "/api/Repositories/save": {
+      "post": {
+        "tags": [
+          "Repositories"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": { }
+              }
+            },
+            "text/json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": { }
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "type": "object",
+                "additionalProperties": { }
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Repositories/saved": {
+      "get": {
+        "tags": [
+          "Repositories"
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/Repositories/{repoId}": {
+      "get": {
+        "tags": [
+          "Repositories"
+        ],
+        "parameters": [
+          {
+            "name": "repoId",
+            "in": "path",
+            "required": true,
+            "schema": {
+              "type": "string"
+            }
+          }
+        ],
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
+    "/api/User": {
+      "post": {
+        "tags": [
+          "User"
+        ],
+        "requestBody": {
+          "content": {
+            "application/json": {
+              "schema": {
+                "$ref": "#/components/schemas/User"
+              }
+            },
+            "text/json": {
+              "schema": {
+                "$ref": "#/components/schemas/User"
+              }
+            },
+            "application/*+json": {
+              "schema": {
+                "$ref": "#/components/schemas/User"
+              }
+            }
+          }
+        },
+        "responses": {
+          "200": {
+            "description": "Success"
+          }
+        }
+      }
+    },
     "/WeatherForecast": {
       "get": {
         "tags": [
@@ -219,6 +498,16 @@
   },
   "components": {
     "schemas": {
+      "AccountType": {
+        "enum": [
+          0,
+          1,
+          2,
+          3
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
       "DateOnly": {
         "type": "object",
         "properties": {
@@ -262,6 +551,259 @@
         ],
         "type": "integer",
         "format": "int32"
+      },
+      "EventLogLevel": {
+        "enum": [
+          0,
+          1,
+          2,
+          3,
+          4,
+          5
+        ],
+        "type": "integer",
+        "format": "int32"
+      },
+      "LogEntry": {
+        "type": "object",
+        "properties": {
+          "eventLogLevel": {
+            "$ref": "#/components/schemas/EventLogLevel"
+          },
+          "message": {
+            "type": "string",
+            "nullable": true
+          },
+          "correlationId": {
+            "type": "string",
+            "nullable": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "Plan": {
+        "type": "object",
+        "properties": {
+          "collaborators": {
+            "type": "integer",
+            "format": "int64",
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "privateRepos": {
+            "type": "integer",
+            "format": "int64",
+            "readOnly": true
+          },
+          "space": {
+            "type": "integer",
+            "format": "int64",
+            "readOnly": true
+          },
+          "billingEmail": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "filledSeats": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "seats": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "RepositoryPermissions": {
+        "type": "object",
+        "properties": {
+          "admin": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "maintain": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "push": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "triage": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "pull": {
+            "type": "boolean",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
+      },
+      "User": {
+        "type": "object",
+        "properties": {
+          "avatarUrl": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "bio": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "blog": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "collaborators": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "readOnly": true
+          },
+          "company": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "createdAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          },
+          "diskUsage": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "readOnly": true
+          },
+          "email": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "followers": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "following": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "hireable": {
+            "type": "boolean",
+            "nullable": true,
+            "readOnly": true
+          },
+          "htmlUrl": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "id": {
+            "type": "integer",
+            "format": "int64",
+            "readOnly": true
+          },
+          "nodeId": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "location": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "login": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "name": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "type": {
+            "$ref": "#/components/schemas/AccountType"
+          },
+          "ownedPrivateRepos": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "plan": {
+            "$ref": "#/components/schemas/Plan"
+          },
+          "privateGists": {
+            "type": "integer",
+            "format": "int32",
+            "nullable": true,
+            "readOnly": true
+          },
+          "publicGists": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "publicRepos": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "totalPrivateRepos": {
+            "type": "integer",
+            "format": "int32",
+            "readOnly": true
+          },
+          "url": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "permissions": {
+            "$ref": "#/components/schemas/RepositoryPermissions"
+          },
+          "siteAdmin": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "suspendedAt": {
+            "type": "string",
+            "format": "date-time",
+            "nullable": true,
+            "readOnly": true
+          },
+          "suspended": {
+            "type": "boolean",
+            "readOnly": true
+          },
+          "ldapDistinguishedName": {
+            "type": "string",
+            "nullable": true,
+            "readOnly": true
+          },
+          "updatedAt": {
+            "type": "string",
+            "format": "date-time",
+            "readOnly": true
+          }
+        },
+        "additionalProperties": false
       },
       "WeatherForecast": {
         "type": "object",

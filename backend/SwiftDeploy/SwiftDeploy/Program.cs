@@ -226,9 +226,12 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.OAuth;
+using MongoDB.Driver;
+using SwiftDeploy.Controllers; // Assuming this is still needed for your controllers
+using SwiftDeploy.Data;
+using SwiftDeploy.Services;
 using System.Security.Claims;
 using System.Text.Json;
-using SwiftDeploy.Controllers; // Assuming this is still needed for your controllers
 
 var builder = WebApplication.CreateBuilder(args);
 
@@ -329,7 +332,21 @@ builder.Services.AddAuthentication(options =>
         }
     };
 });
+builder.Services.Configure<MongoDbSettings>(
+    builder.Configuration.GetSection("MongoDbSettings"));
 
+builder.Services.AddSingleton<MongoDbService>();
+builder.Services.AddSingleton<IMongoClient>(sp =>
+{
+    var settings = builder.Configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>();
+    return new MongoClient(settings.ConnectionString);
+});
+
+builder.Services.AddSingleton<IMongoDatabase>(sp =>
+{
+    var mongoClient = sp.GetRequiredService<IMongoClient>();
+    return mongoClient.GetDatabase("SwiftDeploy"); // change to your DB name
+});
 builder.Services.AddControllers();
 builder.Services.AddEndpointsApiExplorer();
 builder.Services.AddSwaggerGen();

@@ -77,3 +77,9 @@ D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\rjimswa.dswa.cac
 D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
 D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
 D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.build.json.cache
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\DnsClient.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\MongoDB.Bson.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\MongoDB.Driver.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SharpCompress.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Snappier.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\ZstdSharp.dll
