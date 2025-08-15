@@ -7,19 +7,28 @@ import {NavigationBar} from './Components/NavigationBar';
 import Footer from './Components/Footer';
 import Header from './Components/Header';
 import Landing from './Pages/Landing';
+import Projects from './Pages/Projects';
+import AuthCallback from './Components/AuthCallback';
+import { useNavigate } from 'react-router-dom';
  
-
 function App() {
+  const AuthCallbackWrapper = () => {
+  const navigate = useNavigate();
+  return <AuthCallback navigate={navigate} />;
+};
   return (
     <div className="App">
       <Router>
         <Routes>
           <Route path="/" element={<NavigationBar />} />
-          <Route path="/notfound" element={<NotFound />} />
+          <Route path="/*" element={<NotFound />} />
           <Route path="/footer" element={<Footer />} />
           <Route path="/header" element={<Header />} />
           <Route path="/landing" element={<Landing />} />
+          <Route path="/auth-callback" element={<AuthCallbackWrapper />} />
           <Route path="/logs" element={<Logs />} />
+          <Route path="/projects" element={<Projects />} />
+
         </Routes>
       </Router>
     </div>
