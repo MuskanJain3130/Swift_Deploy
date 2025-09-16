@@ -23,15 +23,10 @@ namespace SwiftDeploy.Controllers
         [HttpGet("auth/netlify/login")]
         public IActionResult Login()
         {
-            //var clientId = _config["Netlify:ClientId"];
             var redirectUri = _config["Netlify:RedirectUri"];
-            //var authUrl = $"https://app.netlify.com/authorize?client_id={clientId}&response_type=code&redirect_uri={redirectUri}";
-             // If none is provided, use a default.
-            //string redirectUri = "http://localhost:5173/auth-callback";
-            // The Challenge method will save this RedirectUri in the state parameter.
+            
             return Challenge(new AuthenticationProperties { RedirectUri = redirectUri }, "Netlify");
 
-            //return Redirect(authUrl);
         }
 
 
@@ -107,11 +102,9 @@ namespace SwiftDeploy.Controllers
             var sites = JsonSerializer.Deserialize<object>(body);
             return Ok(sites);
         }
-
         [HttpPost("netlify/deploy")]
         public async Task<IActionResult> CreateSiteAndDeploy([FromBody] DeployRequest request)
         {
-            // 🔑 Netlify PAT (store securely in env vars ideally)
             var netlifyToken = Request.Cookies["NetlifyAccessToken"];
             if (string.IsNullOrEmpty(netlifyToken))
                 return Unauthorized(new { error = "Netlify token not found. Please login first." });
@@ -135,23 +128,109 @@ namespace SwiftDeploy.Controllers
                 },
                 build_settings = new
                 {
-                    @base = "/", 
-                    publish="/",// Sets the base directory
-                    functions_dir = "netlify/functions" // Sets the functions directory
+                    @base = "/",
+                    functions_dir = "netlify/functions"
                 }
             };
 
+            // Create site
             var createSiteResp = await client.PostAsJsonAsync("https://api.netlify.com/api/v1/sites", sitePayload);
             var siteResponseBody = await createSiteResp.Content.ReadAsStringAsync();
 
             if (!createSiteResp.IsSuccessStatusCode)
                 return BadRequest(new { message = "Site creation failed", error = siteResponseBody });
-            Console.WriteLine(siteResponseBody);
+
             var siteData = JsonDocument.Parse(siteResponseBody);
             var siteId = siteData.RootElement.GetProperty("id").GetString();
             var siteUrl = siteData.RootElement.GetProperty("url").GetString();
 
-            // ✅ Kick off build
+            // --------- GitHub API client for committing netlify.toml -----------
+            var githubClient = new HttpClient();
+            githubClient.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", githubToken);
+            githubClient.DefaultRequestHeaders.UserAgent.ParseAdd("SwiftDeployApp"); // Required by GitHub API
+
+            // Step 1: Get latest commit SHA on branch
+            var refResp = await githubClient.GetAsync($"https://api.github.com/repos/{request.Repo}/git/ref/heads/{request.Branch}");
+            if (!refResp.IsSuccessStatusCode)
+                return BadRequest(new { message = "Failed to get branch ref from GitHub", error = await refResp.Content.ReadAsStringAsync() });
+
+            var refData = JsonDocument.Parse(await refResp.Content.ReadAsStringAsync());
+            string latestCommitSha = refData.RootElement.GetProperty("object").GetProperty("sha").GetString();
+
+            // Step 2: Get tree SHA of latest commit
+            var commitResp = await githubClient.GetAsync($"https://api.github.com/repos/{request.Repo}/git/commits/{latestCommitSha}");
+            if (!commitResp.IsSuccessStatusCode)
+                return BadRequest(new { message = "Failed to get commit info from GitHub", error = await commitResp.Content.ReadAsStringAsync() });
+
+            var commitData = JsonDocument.Parse(await commitResp.Content.ReadAsStringAsync());
+            string treeSha = commitData.RootElement.GetProperty("tree").GetProperty("sha").GetString();
+
+            // Step 3: Create a new blob for netlify.toml content
+            string netlifyTomlContent = @"
+                [build]
+                  base = "".""
+                  publish = "".""
+                  functions = ""netlify/functions""
+                ";
+            // to be replaced in the future with a proper template engine
+            var blobPayload = new
+            {
+                content = Convert.ToBase64String(System.Text.Encoding.UTF8.GetBytes(netlifyTomlContent)),
+                encoding = "base64"
+            };
+
+            var blobResp = await githubClient.PostAsJsonAsync($"https://api.github.com/repos/{request.Repo}/git/blobs", blobPayload);
+            if (!blobResp.IsSuccessStatusCode)
+                return BadRequest(new { message = "Failed to create blob for netlify.toml", error = await blobResp.Content.ReadAsStringAsync() });
+
+            var blobData = JsonDocument.Parse(await blobResp.Content.ReadAsStringAsync());
+            string blobSha = blobData.RootElement.GetProperty("sha").GetString();
+
+            // Step 4: Create new tree with netlify.toml update
+            var newTreePayload = new
+            {
+                base_tree = treeSha,
+                tree = new[]
+                {
+                    new
+                    {
+                        path = "netlify.toml",
+                        mode = "100644",
+                        type = "blob",
+                        sha = blobSha
+                    }
+                }
+            };
+
+            var treeResp = await githubClient.PostAsJsonAsync($"https://api.github.com/repos/{request.Repo}/git/trees", newTreePayload);
+            if (!treeResp.IsSuccessStatusCode)
+                return BadRequest(new { message = "Failed to create new tree for netlify.toml update", error = await treeResp.Content.ReadAsStringAsync() });
+
+            var treeData = JsonDocument.Parse(await treeResp.Content.ReadAsStringAsync());
+            string newTreeSha = treeData.RootElement.GetProperty("sha").GetString();
+
+            // Step 5: Create new commit referencing new tree and latest commit parent
+            var newCommitPayload = new
+            {
+                message = "Add netlify.toml to configure build and publish settings",
+                tree = newTreeSha,
+                parents = new[] { latestCommitSha }
+            };
+
+            var newCommitResp = await githubClient.PostAsJsonAsync($"https://api.github.com/repos/{request.Repo}/git/commits", newCommitPayload);
+            if (!newCommitResp.IsSuccessStatusCode)
+                return BadRequest(new { message = "Failed to create new commit for netlify.toml", error = await newCommitResp.Content.ReadAsStringAsync() });
+
+            var newCommitData = JsonDocument.Parse(await newCommitResp.Content.ReadAsStringAsync());
+            string newCommitSha = newCommitData.RootElement.GetProperty("sha").GetString();
+
+            // Step 6: Update branch reference to new commit SHA
+            var updateRefPayload = new { sha = newCommitSha };
+            var updateRefResp = await githubClient.PatchAsJsonAsync($"https://api.github.com/repos/{request.Repo}/git/refs/heads/{request.Branch}", updateRefPayload);
+            if (!updateRefResp.IsSuccessStatusCode)
+                return BadRequest(new { message = "Failed to update GitHub branch reference with new commit", error = await updateRefResp.Content.ReadAsStringAsync() });
+
+            // ------------- Trigger Netlify build --------------
             var buildResp = await client.PostAsync($"https://api.netlify.com/api/v1/sites/{siteId}/builds", null);
             var buildBody = await buildResp.Content.ReadAsStringAsync();
 
@@ -160,58 +239,12 @@ namespace SwiftDeploy.Controllers
 
             return Ok(new
             {
-                message = "Deployment started!",
+                message = "Deployment started with committed netlify.toml!",
                 site_id = siteId,
                 site_url = siteUrl,
                 build_response = JsonSerializer.Deserialize<object>(buildBody)
             });
         }
-        //public async Task<IActionResult> CreateSiteAndDeploy([FromBody] DeployRequest request)
-        //{
-        //    var token = Request.Cookies["NetlifyAccessToken"];
-        //    if (string.IsNullOrEmpty(token))
-        //        return Unauthorized(new { error = "Netlify token not found. Please login first." });
-
-        //    using var client = new HttpClient();
-        //    client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", token);
-
-        //    // 1. Create a new site
-        //    var sitePayload = new
-        //    {
-        //        name = $"swiftdeploy-{Guid.NewGuid():N}".Substring(0, 16),
-        //        build_settings = new
-        //        {
-        //            repo_url = $"https://github.com/{request.Repo}",
-        //            provider = "github",
-        //            repo_branch = request.Branch ?? "main"
-        //        }
-        //    };
-
-        //    var createSiteResp = await client.PostAsJsonAsync("https://api.netlify.com/api/v1/sites", sitePayload);
-        //    var siteResponseBody = await createSiteResp.Content.ReadAsStringAsync();
-
-        //    if (!createSiteResp.IsSuccessStatusCode)
-        //        return BadRequest(new { message = "Site creation failed", error = siteResponseBody });
-
-        //    var siteData = JsonDocument.Parse(siteResponseBody);
-        //    var siteId = siteData.RootElement.GetProperty("id").GetString();
-
-        //    // 2. Trigger build
-        //    var buildResp = await client.PostAsync($"https://api.netlify.com/api/v1/sites/{siteId}/builds", null);
-        //    var buildBody = await buildResp.Content.ReadAsStringAsync();
-
-        //    if (!buildResp.IsSuccessStatusCode)
-        //        return BadRequest(new { message = "Build trigger failed", error = buildBody });
-
-        //    return Ok(new
-        //    {
-        //        message = "Deployment started!",
-        //        site_id = siteId,
-        //        site_url = siteData.RootElement.GetProperty("url").GetString(),
-        //        build_response = JsonSerializer.Deserialize<object>(buildBody)
-        //    });
-        //}
-
     }
 
 }
