@@ -18,6 +18,7 @@ public class CloudflarePagesController : ControllerBase
     private string GenerateProjectName(string owner, string repo, string branch)
     {
         string raw = $"{owner}-{repo}-{branch}-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";
+        
         using var sha1 = SHA1.Create();
         var hash = sha1.ComputeHash(Encoding.UTF8.GetBytes(raw));
         var hex = BitConverter.ToString(hash).Replace("-", "").ToLower();
