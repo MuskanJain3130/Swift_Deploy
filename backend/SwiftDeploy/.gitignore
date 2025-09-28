@@ -1,0 +1,57 @@
+﻿## Build results
+bin/
+obj/
+[Bb]uild/
+[Ll]og/
+artifacts/
+
+## User-specific files
+*.suo
+*.user
+*.userosscache
+*.sln.docstates
+*.vspscc
+*.vssscc
+*.pidb
+*.svclog
+
+## Visual Studio settings
+.vs/
+*.dbmdl
+*.dbproj.schemaview
+*.pfx
+*.publishsettings
+
+## ASP.NET static files (optional)
+# Uncomment if you generate static files in wwwroot
+#wwwroot/
+
+## Test results
+TestResult*/
+*.trx
+*.coverage
+*.coveragexml
+*.nunit.xml
+
+## NuGet packages
+*.nupkg
+*.snupkg
+packages/
+project.lock.json
+project.fragment.lock.json
+
+## VS Code settings
+.vscode/
+
+## Logs and temp files
+*.log
+*.tmp
+*.temp
+*.bak
+
+## Others
+*.ide
+*.DS_Store
+*.orig
+_ReSharper*/
+*.DotSettings.user
