@@ -159,7 +159,38 @@ builder.Services.AddAuthentication(options =>
             context.HandleResponse();
         }
     };
-});
+}).AddOAuth("Vercel", options =>
+{
+    options.ClientId = builder.Configuration["Vercel:ClientId"];
+    options.ClientSecret = builder.Configuration["Vercel:ClientSecret"];
+    options.CallbackPath = new PathString("/api/auth/vercel/callback");
+
+    options.AuthorizationEndpoint = "https://vercel.com/oauth/authorize";
+    options.TokenEndpoint = "https://api.vercel.com/v2/oauth/access_token";
+    options.UserInformationEndpoint = "https://api.vercel.com/v2/user";
+
+    options.Scope.Add("all"); // request full access
+
+    options.SaveTokens = true;
+
+    options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
+    options.ClaimActions.MapJsonKey(ClaimTypes.Name, "username");
+
+    options.Events = new Microsoft.AspNetCore.Authentication.OAuth.OAuthEvents
+    {
+        OnCreatingTicket = async context =>
+        {
+            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
+            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
+
+            var response = await context.Backchannel.SendAsync(request);
+            response.EnsureSuccessStatusCode();
+
+            var user = JsonDocument.Parse(await response.Content.ReadAsStringAsync()).RootElement;
+            context.RunClaimActions(user);
+        }
+    };
+}); ;
 
 builder.Services.Configure<MongoDbSettings>(
     builder.Configuration.GetSection("MongoDbSettings"));
