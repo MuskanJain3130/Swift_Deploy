@@ -8,6 +8,7 @@ import Footer from './Components/Footer';
 import Header from './Components/Header';
 import Landing from './Pages/Landing';
 import AuthCallback from './Components/AuthCallback';
+import RepositoryContent from './Pages/RepositoryContent';
 import { useNavigate } from 'react-router-dom';
  
 function App() {
@@ -26,6 +27,7 @@ function App() {
           <Route path="/landing" element={<Landing />} />
           <Route path="/auth-callback" element={<AuthCallbackWrapper />} />
           <Route path="/logs" element={<Logs />} />
+          <Route path="/repository/:owner/:repoName/*" element={<RepositoryContent />} />
         </Routes>
       </Router>
     </div>

@@ -20,6 +20,27 @@
     "ReturnTypes": []
   },
   {
+    "ContainingType": "CloudflarePagesController",
+    "Method": "Initiate",
+    "RelativePath": "api/cloudflare/initiate",
+    "HttpMethod": "POST",
+    "IsController": true,
+    "Order": 0,
+    "Parameters": [
+      {
+        "Name": "Cloudflare-Api-Token",
+        "Type": "System.String",
+        "IsRequired": false
+      },
+      {
+        "Name": "requestData",
+        "Type": "RequestData",
+        "IsRequired": true
+      }
+    ],
+    "ReturnTypes": []
+  },
+  {
     "ContainingType": "SwiftDeploy.Controllers.RepositoriesController",
     "Method": "GetRepositories",
     "RelativePath": "api/Repositories",
@@ -141,7 +162,6 @@
         ],
         "StatusCode": 200
       }
-    ],
-    "EndpointName": "GetWeatherForecast"
+    ]
   }
 ]

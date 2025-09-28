@@ -853,24 +853,19 @@
     ]
   },
   "packageFolders": {
-    "C:\\Users\\taman\\.nuget\\packages\\": {},
-    "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages": {}
+    "C:\\Users\\aarsh\\.nuget\\packages\\": {}
   },
   "project": {
     "version": "1.0.0",
     "restore": {
-      "projectUniqueName": "D:\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj",
+      "projectUniqueName": "C:\\DESKTOP\\Sem 7\\Project\\SwiftDeploy1\\Swift_Deploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj",
       "projectName": "SwiftDeploy",
-      "projectPath": "D:\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj",
-      "packagesPath": "C:\\Users\\taman\\.nuget\\packages\\",
-      "outputPath": "D:\\SwiftDeploy\\backend\\SwiftDeploy\\SwiftDeploy\\obj\\",
+      "projectPath": "C:\\DESKTOP\\Sem 7\\Project\\SwiftDeploy1\\Swift_Deploy\\backend\\SwiftDeploy\\SwiftDeploy\\SwiftDeploy.csproj",
+      "packagesPath": "C:\\Users\\aarsh\\.nuget\\packages\\",
+      "outputPath": "C:\\DESKTOP\\Sem 7\\Project\\SwiftDeploy1\\Swift_Deploy\\backend\\SwiftDeploy\\SwiftDeploy\\obj\\",
       "projectStyle": "PackageReference",
-      "fallbackFolders": [
-        "C:\\Program Files (x86)\\Microsoft Visual Studio\\Shared\\NuGetPackages"
-      ],
       "configFilePaths": [
-        "C:\\Users\\taman\\AppData\\Roaming\\NuGet\\NuGet.Config",
-        "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.FallbackLocation.config",
+        "C:\\Users\\aarsh\\AppData\\Roaming\\NuGet\\NuGet.Config",
         "C:\\Program Files (x86)\\NuGet\\Config\\Microsoft.VisualStudio.Offline.config"
       ],
       "originalTargetFrameworks": [
@@ -895,8 +890,7 @@
         "enableAudit": "true",
         "auditLevel": "low",
         "auditMode": "direct"
-      },
-      "SdkAnalysisLevel": "9.0.300"
+      }
     },
     "frameworks": {
       "net8.0": {
@@ -938,7 +932,7 @@
             "privateAssets": "all"
           }
         },
-        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\9.0.304/PortableRuntimeIdentifierGraph.json"
+        "runtimeIdentifierGraphPath": "C:\\Program Files\\dotnet\\sdk\\8.0.200/PortableRuntimeIdentifierGraph.json"
       }
     }
   }
