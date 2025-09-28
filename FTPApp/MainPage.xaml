@@ -1,0 +1,32 @@
+﻿<ContentPage xmlns="http://schemas.microsoft.com/dotnet/2021/maui"
+             xmlns:x="http://schemas.microsoft.com/winfx/2009/xaml"
+             x:Class="FTPApp.MainPage">
+    <VerticalStackLayout Padding="30,20" Spacing="20">
+    <NavigationPage.TitleView>
+        <HorizontalStackLayout HorizontalOptions="Center" VerticalOptions="Center">
+            <Image Source="logo.ico" HeightRequest="40"/>
+            <Label Text="FTP Uploader" 
+                   VerticalOptions="Center"
+                   TextColor="Black"
+                   FontSize="18"
+                   Margin="10,0,0,0"/>
+        </HorizontalStackLayout>
+    </NavigationPage.TitleView>
+
+        <!-- Top Image -->
+        <Image Source="swiftdeploylogo.jpg" HeightRequest="250" HorizontalOptions="Center" /> 
+
+        <!-- User Email Entry -->
+        <Entry x:Name="EmailEntry" Placeholder="Enter your email" Keyboard="Email" />
+
+        <!-- Buttons -->
+        <HorizontalStackLayout Spacing="25" HorizontalOptions="Center">
+            <Button Text="Upload Folder" Clicked="OnUploadFolderClicked"/>
+            <Button Text="Upload File(s)" Clicked="OnUploadFilesClicked"/>
+        </HorizontalStackLayout>
+
+        <!-- Status Label -->
+        <Label x:Name="StatusLabel" Text="Status will appear here" />
+
+    </VerticalStackLayout>
+</ContentPage>

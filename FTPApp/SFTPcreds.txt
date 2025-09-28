@@ -1,0 +1,12 @@
+Write only
+Username = swiftdeploy1
+pwd = pSXfRnGicNKx3y3tHyGvRvFBmFL1+ndb
+Connection string of the blob
+swiftdeploy.swiftdeploy1@swiftdeploy.blob.core.windows.net
+
+
+Read+delete
+Username = swiftdeployp2
+wd = mbAJTjpwdNzfI4LTzYhN3aJeubod30kF
+connection string of the blob
+swiftdeploy.swiftdeploy2@swiftdeploy.blob.core.windows.net
