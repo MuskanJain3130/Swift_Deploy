@@ -7,6 +7,7 @@ import {NavigationBar} from './Components/NavigationBar';
 import Footer from './Components/Footer';
 import Header from './Components/Header';
 import Landing from './Pages/Landing';
+import Projects from './Pages/Projects';
 import AuthCallback from './Components/AuthCallback';
 import RepositoryContent from './Pages/RepositoryContent';
 import { useNavigate } from 'react-router-dom';
@@ -21,13 +22,14 @@ function App() {
       <Router>
         <Routes>
           <Route path="/" element={<NavigationBar />} />
+          <Route path="/projects" element={<Projects />} />
           <Route path="/*" element={<NotFound />} />
           <Route path="/footer" element={<Footer />} />
           <Route path="/header" element={<Header />} />
           <Route path="/landing" element={<Landing />} />
           <Route path="/auth-callback" element={<AuthCallbackWrapper />} />
           <Route path="/logs" element={<Logs />} />
-          <Route path="/repository/:owner/:repoName/*" element={<RepositoryContent />} />
+          <Route path="/projects" element={<Projects />} />
         </Routes>
       </Router>
     </div>
