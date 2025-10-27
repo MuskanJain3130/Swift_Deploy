@@ -1,4 +1,5 @@
 import React, { useState } from 'react';
+import PropTypes from 'prop-types';
 import { ChevronDown, ChevronRight, ArrowLeft } from 'lucide-react';
 import NavigationBar from '../Components/NavigationBar'; // Assuming this path is correct for your NavigationBar
 import '../css/Logs.css'; // Ensure this path is correct relative to Logs.js
@@ -124,5 +125,6 @@ const Logs = () => {
     </div>
   );
 };
+
 
 export default Logs;
