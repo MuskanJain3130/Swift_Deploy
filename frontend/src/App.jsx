@@ -7,8 +7,12 @@ import {NavigationBar} from './Components/NavigationBar';
 import Footer from './Components/Footer';
 import Header from './Components/Header';
 import Landing from './Pages/Landing';
+import Profile from './Pages/Profile';
 import Projects from './Pages/Projects';
 import AuthCallback from './Components/AuthCallback';
+import CompleteProfile from './Pages/CompleteProfile';
+import Login from './Pages/Login';
+import RegisterUser from './Pages/RegisterUser';
 import { useNavigate } from 'react-router-dom';
  
 function App() {
@@ -26,8 +30,12 @@ function App() {
           <Route path="/header" element={<Header />} />
           <Route path="/landing" element={<Landing />} />
           <Route path="/auth-callback" element={<AuthCallbackWrapper />} />
-          <Route path="/logs" element={<Logs />} />
+          <Route path="/logs" element={<Logs a="" b={0}/>} />
           <Route path="/projects" element={<Projects />} />
+          <Route path="/complete-profile/:userId" element={<CompleteProfile />} />
+          <Route path="/register" element={<RegisterUser />} />
+          <Route path="/profile" element={<Profile />} />
+          <Route path="/login" element={<Login />} />
 
         </Routes>
       </Router>
