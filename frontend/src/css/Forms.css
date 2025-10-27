@@ -1,0 +1,104 @@
+/* Common container for all pages */
+.page-container {
+  min-height: 100vh;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  background: linear-gradient(0deg, #20003a, #20003a);
+  padding: clamp(2rem, 4vw, 4rem) clamp(1rem, 5vw, 3rem);
+}
+
+/* Card layout */
+.card {
+  background: #fff;
+  border-radius: 1rem; /* 16px approx */
+  box-shadow: 0 0.5rem 1.5rem rgba(0,0,0,0.15); /* 8px and 24px approx */
+  padding: clamp(2.5rem, 2.5vw, 5rem);
+  max-width: clamp(280px, 80vw, 400px);
+  width: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  transition: box-shadow 0.3s, transform 0.3s;
+}
+
+/* Logo styles */
+.logo {
+  width: clamp(60px, 10vw, 80px);
+  height: clamp(60px, 10vw, 80px);
+  margin-bottom: clamp(1rem, 2vw, 1.25rem);
+  border-radius: 50%;
+}
+
+/* Title styles */
+.page-title {
+  font-size: clamp(1.5rem, 4vw, 2.2rem);
+  font-weight: 700;
+  color: #20003a;
+  margin-bottom: clamp(1.5rem, 3vw, 1.5rem);
+  text-align: center;
+}
+
+/* Input fields */
+input[type="text"], 
+input[type="email"], 
+input[type="password"] {
+  width: 100%;
+  padding: clamp(0.75rem, 1vw, 1rem) clamp(1rem, 1vw, 1.5rem);
+  margin-bottom: clamp(1rem, 2vw, 1.25rem);
+  border-radius: 0.5rem;
+  border: 1px solid #ccc;
+  font-size: clamp(0.9rem, 1.5vw, 1rem);
+}
+
+input[type="text"]:focus, 
+input[type="email"]:focus, 
+input[type="password"]:focus {
+  outline: none;
+  border-color: #7c4dff;
+}
+
+/* Buttons */
+.btn {
+  width: 100%;
+  padding: clamp(0.75rem, 2vw, 1rem);
+  border: none;
+  border-radius: 0.5rem;
+  background-color: #20003a;
+  color: #fff;
+  font-size: clamp(1rem, 2vw, 1.1rem);
+  font-weight: 600;
+  cursor: pointer;
+  transition: background-color 0.2s;
+}
+
+.btn:hover {
+  background-color: #7c4dff;
+  transition: background-color 0.2s;
+  color: white;
+}
+
+/* Error and success message styles */
+.message {
+  margin-top: clamp(1rem, 2vw, 1.25rem);
+  font-size: clamp(0.9rem, 1.5vw, 1rem);
+  text-align: center;
+}
+
+.error {
+  color: #f44336;
+}
+
+.success {
+  color: #4caf50;
+}
+
+/* Responsive adjustments */
+@media(max-width: 500px) {
+  .card {
+    padding: clamp(1.5rem, 5vw, 3rem);
+  }
+  .page-title {
+    font-size: clamp(1.2rem, 5vw, 1.8rem);
+  }
+}

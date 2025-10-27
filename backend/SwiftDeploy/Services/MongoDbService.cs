@@ -1,8 +1,9 @@
 ﻿using Microsoft.Extensions.Options;
 using Microsoft.IdentityModel.Abstractions;
 using MongoDB.Driver;
-using Octokit;
 using SwiftDeploy.Data;
+using SwiftDeploy.Models;
+using SwiftDeploy.Models.SwiftDeploy.Models;
 
 namespace SwiftDeploy.Services
 { 
@@ -17,9 +18,10 @@ namespace SwiftDeploy.Services
         }
 
         public IMongoCollection<User> Users => _database.GetCollection<User>("Users");
+        public IMongoCollection<UserTokens> UserTokens => _database.GetCollection<UserTokens>("UserTokens");
         public IMongoCollection<Deployment> Deployments => _database.GetCollection<Deployment>("Deployments");
         public IMongoCollection<Repository> Repositories => _database.GetCollection<Repository>("Repositories");
-       public IMongoCollection<LogEntry> Logs => _database.GetCollection<LogEntry>("Logs");
+       public IMongoCollection<Models.LogEntry> Logs => _database.GetCollection<Models.LogEntry>("Logs");
 
     }
 }

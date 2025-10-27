@@ -5,10 +5,12 @@ using System.Security.Cryptography;
 using System.Text;
 using System.Text.Json;
 using System.Threading.Tasks;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 
 [ApiController]
 [Route("api/cloudflare")]
+[Authorize]
 public class CloudflarePagesController : ControllerBase
 {
     private const string BaseApiUrl = "https://api.cloudflare.com/client/v4/accounts";
