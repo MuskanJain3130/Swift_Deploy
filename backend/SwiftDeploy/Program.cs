@@ -1,17 +1,27 @@
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
+using Microsoft.AspNetCore.Authentication.JwtBearer;
 using Microsoft.AspNetCore.Authentication.OAuth;
+using Microsoft.IdentityModel.Tokens;
 using MongoDB.Driver;
-using SwiftDeploy.Controllers; // Assuming this is still needed for your controllers
+using SwiftDeploy.Controllers;
 using SwiftDeploy.Data;
 using SwiftDeploy.Services;
+using SwiftDeploy.Services.Interfaces;
+using System.IdentityModel.Tokens.Jwt;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 
 var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
-builder.Services.AddHttpClient(); // This registers the default HttpClient factory
+builder.Services.AddHttpClient();
+builder.Services.AddScoped<ITemplateEngine, TemplateEngine>();
+builder.Services.AddScoped<IGitHubService, GitHubService>();
+builder.Services.AddScoped<IUnifiedDeploymentService, UnifiedDeploymentService>();
+builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<JwtHelper>(); // Add this line with your other services
 
 builder.Services.AddAuthentication(options =>
 {
@@ -27,6 +37,19 @@ builder.Services.AddAuthentication(options =>
     options.Cookie.IsEssential = true;
     // Ensure the cookie path is root to be accessible everywhere
     options.Cookie.Path = "/";
+})
+.AddJwtBearer("JWT", options =>
+{
+    options.TokenValidationParameters = new TokenValidationParameters
+    {
+        ValidateIssuer = true,
+        ValidateAudience = true,
+        ValidateLifetime = true,
+        ValidateIssuerSigningKey = true,
+        ValidIssuer = builder.Configuration["Jwt:Issuer"],
+        ValidAudience = builder.Configuration["Jwt:Audience"],
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+    };
 })
 .AddOAuth("GitHub", options =>
 {
@@ -233,7 +256,7 @@ builder.Services.AddCookiePolicy(options =>
 var app = builder.Build();
 
 app.UseCors(builder =>
-    builder.WithOrigins("http://localhost:5173", "https://localhost:5173") // Add https origin for frontend if applicable
+    builder.WithOrigins("http://localhost:5173", "https://localhost:5174") // Add https origin for frontend if applicable
            .AllowAnyHeader()
            .AllowAnyMethod()
            .AllowCredentials());
