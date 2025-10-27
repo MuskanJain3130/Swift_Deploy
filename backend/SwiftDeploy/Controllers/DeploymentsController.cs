@@ -1,4 +1,5 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using SwiftDeploy.Models;
@@ -8,6 +9,7 @@ namespace SwiftDeploy.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class DeploymentsController : ControllerBase
     {
             private readonly IMongoCollection<Deployment> _deployments;
@@ -66,7 +68,7 @@ namespace SwiftDeploy.Controllers
 
         [HttpDelete("{id}")]
             public IActionResult DeleteDeployment(string id)
-            {
+            {   
                 var result = _deployments.DeleteOne(d => d.Id == id);
 
                 if (result.DeletedCount == 0)
