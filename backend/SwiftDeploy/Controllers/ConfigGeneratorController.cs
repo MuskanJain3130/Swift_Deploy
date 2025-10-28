@@ -8,7 +8,7 @@ namespace SwiftDeploy.Controllers
 {
     [ApiController]
     [Route("api/[controller]")]
-    [Authorize]
+    //[Authorize]
     public class ConfigGeneratorController : ControllerBase
     {
         private readonly ITemplateEngine _templateEngine;

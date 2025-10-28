@@ -17,12 +17,12 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddHttpClient();
+builder.Services.AddHttpContextAccessor();
 builder.Services.AddScoped<ITemplateEngine, TemplateEngine>();
 builder.Services.AddScoped<IGitHubService, GitHubService>();
 builder.Services.AddScoped<IUnifiedDeploymentService, UnifiedDeploymentService>();
 builder.Services.AddScoped<TokenService>();
-builder.Services.AddScoped<JwtHelper>(); // Add this line with your other services
-
+builder.Services.AddScoped<JwtHelper>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
