@@ -31,7 +31,6 @@ namespace SwiftDeploy.Services
                 _ => throw new ArgumentException($"Unsupported platform: {platform}")
             };
         }
-
         public string GetContentType(string platform)
         {
             return platform.ToLower() switch
@@ -46,23 +45,53 @@ namespace SwiftDeploy.Services
 
         private async Task<string> GenerateVercelConfigAsync(CommonConfig config)
         {
-            var vercelConfig = new
+            var vercelConfig = new Dictionary<string, object>
             {
-                version = 2,
-                name = config.ProjectName,
-                buildCommand = config.BuildCommand,
-                outputDirectory = config.OutputDirectory,
-                installCommand = config.InstallCommand,
-                devCommand = "npm run dev",
-                framework = config.Framework,
-                env = config.EnvironmentVariables,
-                redirects = config.Redirects.Select(r => new
+                ["version"] = 2,
+                ["name"] = config.ProjectName
+            };
+
+            // For static projects
+            if (config.ProjectType == ProjectType.Static)
+            {
+                vercelConfig["builds"] = new[]
+                {
+            new
+            {
+                src = config.OutputDirectory == "." ? "**/*" : $"{config.OutputDirectory}/**",
+                use = "@vercel/static"
+            }
+        };
+            }
+            else
+            {
+                // For framework projects
+                vercelConfig["buildCommand"] = config.BuildCommand;
+                vercelConfig["outputDirectory"] = config.OutputDirectory;
+                vercelConfig["installCommand"] = config.InstallCommand;
+                vercelConfig["devCommand"] = "npm run dev";
+                vercelConfig["framework"] = config.Framework;
+            }
+
+            // Common configurations
+            if (config.EnvironmentVariables?.Any() == true)
+            {
+                vercelConfig["env"] = config.EnvironmentVariables;
+            }
+
+            if (config.Redirects?.Any() == true)
+            {
+                vercelConfig["redirects"] = config.Redirects.Select(r => new
                 {
                     source = r.From,
                     destination = r.To,
                     statusCode = r.Status
-                }).ToArray(),
-                headers = config.Headers.Select(h => new
+                }).ToArray();
+            }
+
+            if (config.Headers?.Any() == true)
+            {
+                vercelConfig["headers"] = config.Headers.Select(h => new
                 {
                     source = h.Source,
                     headers = h.Headers.Select(kv => new
@@ -70,8 +99,8 @@ namespace SwiftDeploy.Services
                         key = kv.Key,
                         value = kv.Value
                     }).ToArray()
-                }).ToArray()
-            };
+                }).ToArray();
+            }
 
             return JsonSerializer.Serialize(vercelConfig, new JsonSerializerOptions
             {
@@ -87,12 +116,25 @@ namespace SwiftDeploy.Services
             sb.AppendLine("compatibility_date = \"2023-05-18\"");
             sb.AppendLine();
 
+            // Build configuration
             sb.AppendLine("[build]");
-            sb.AppendLine($"command = \"{config.BuildCommand}\"");
-            sb.AppendLine($"publish = \"{config.OutputDirectory}\"");
+
+            if (config.ProjectType == ProjectType.Static)
+            {
+                // For static projects, no build command needed
+                sb.AppendLine($"command = \"\"");
+                sb.AppendLine($"publish = \"{config.OutputDirectory}\"");
+            }
+            else
+            {
+                // For framework projects
+                sb.AppendLine($"command = \"{config.BuildCommand}\"");
+                sb.AppendLine($"publish = \"{config.OutputDirectory}\"");
+            }
             sb.AppendLine();
 
-            if (config.EnvironmentVariables.Any())
+            // Environment variables
+            if (config.EnvironmentVariables?.Any() == true)
             {
                 sb.AppendLine("[vars]");
                 foreach (var env in config.EnvironmentVariables)
@@ -102,7 +144,8 @@ namespace SwiftDeploy.Services
                 sb.AppendLine();
             }
 
-            if (config.Redirects.Any())
+            // Redirects
+            if (config.Redirects?.Any() == true)
             {
                 foreach (var redirect in config.Redirects)
                 {
@@ -114,7 +157,8 @@ namespace SwiftDeploy.Services
                 }
             }
 
-            if (config.Headers.Any())
+            // Headers
+            if (config.Headers?.Any() == true)
             {
                 foreach (var header in config.Headers)
                 {
@@ -151,33 +195,47 @@ namespace SwiftDeploy.Services
             sb.AppendLine("    - name: Checkout");
             sb.AppendLine("      uses: actions/checkout@v3");
             sb.AppendLine();
-            sb.AppendLine("    - name: Setup Node.js");
-            sb.AppendLine("      uses: actions/setup-node@v3");
-            sb.AppendLine("      with:");
-            sb.AppendLine($"        node-version: '{config.NodeVersion}'");
-            sb.AppendLine("        cache: 'npm'");
-            sb.AppendLine();
-            sb.AppendLine("    - name: Install dependencies");
-            sb.AppendLine($"      run: {config.InstallCommand}");
-            sb.AppendLine();
-            sb.AppendLine("    - name: Build");
-            sb.AppendLine($"      run: {config.BuildCommand}");
 
-            if (config.EnvironmentVariables.Any())
+            if (config.ProjectType == ProjectType.Static)
             {
-                sb.AppendLine("      env:");
-                foreach (var env in config.EnvironmentVariables)
-                {
-                    sb.AppendLine($"        {env.Key}: ${{{{ secrets.{env.Key} }}}}");
-                }
+                // For static projects, skip Node.js setup and build steps
+                sb.AppendLine("    - name: Deploy to GitHub Pages");
+                sb.AppendLine("      uses: peaceiris/actions-gh-pages@v3");
+                sb.AppendLine("      with:");
+                sb.AppendLine("        github_token: ${{ secrets.GITHUB_TOKEN }}");
+                sb.AppendLine($"        publish_dir: ./{config.OutputDirectory}");
             }
+            else
+            {
+                // For framework projects, include full build process
+                sb.AppendLine("    - name: Setup Node.js");
+                sb.AppendLine("      uses: actions/setup-node@v3");
+                sb.AppendLine("      with:");
+                sb.AppendLine($"        node-version: '{config.NodeVersion ?? "18"}'");
+                sb.AppendLine("        cache: 'npm'");
+                sb.AppendLine();
+                sb.AppendLine("    - name: Install dependencies");
+                sb.AppendLine($"      run: {config.InstallCommand ?? "npm install"}");
+                sb.AppendLine();
+                sb.AppendLine("    - name: Build");
+                sb.AppendLine($"      run: {config.BuildCommand}");
 
-            sb.AppendLine();
-            sb.AppendLine("    - name: Deploy to GitHub Pages");
-            sb.AppendLine("      uses: peaceiris/actions-gh-pages@v3");
-            sb.AppendLine("      with:");
-            sb.AppendLine("        github_token: ${{ secrets.GITHUB_TOKEN }}");
-            sb.AppendLine($"        publish_dir: ./{config.OutputDirectory}");
+                if (config.EnvironmentVariables?.Any() == true)
+                {
+                    sb.AppendLine("      env:");
+                    foreach (var env in config.EnvironmentVariables)
+                    {
+                        sb.AppendLine($"        {env.Key}: ${{{{ secrets.{env.Key} }}}}");
+                    }
+                }
+
+                sb.AppendLine();
+                sb.AppendLine("    - name: Deploy to GitHub Pages");
+                sb.AppendLine("      uses: peaceiris/actions-gh-pages@v3");
+                sb.AppendLine("      with:");
+                sb.AppendLine("        github_token: ${{ secrets.GITHUB_TOKEN }}");
+                sb.AppendLine($"        publish_dir: ./{config.OutputDirectory}");
+            }
 
             if (!string.IsNullOrEmpty(config.Domain))
             {
@@ -191,11 +249,22 @@ namespace SwiftDeploy.Services
             var sb = new StringBuilder();
 
             sb.AppendLine("[build]");
-            sb.AppendLine($"  command = \"{config.BuildCommand}\"");
-            sb.AppendLine($"  publish = \"{config.OutputDirectory}\"");
+
+            if (config.ProjectType == ProjectType.Static)
+            {
+                // For static projects, no build command needed
+                sb.AppendLine($"  publish = \"{config.OutputDirectory}\"");
+            }
+            else
+            {
+                // For framework projects
+                sb.AppendLine($"  command = \"{config.BuildCommand}\"");
+                sb.AppendLine($"  publish = \"{config.OutputDirectory}\"");
+            }
             sb.AppendLine();
 
-            if (config.EnvironmentVariables.Any())
+            // Environment variables
+            if (config.EnvironmentVariables?.Any() == true)
             {
                 sb.AppendLine("[build.environment]");
                 foreach (var env in config.EnvironmentVariables)
@@ -205,7 +274,8 @@ namespace SwiftDeploy.Services
                 sb.AppendLine();
             }
 
-            if (config.Redirects.Any())
+            // Redirects
+            if (config.Redirects?.Any() == true)
             {
                 foreach (var redirect in config.Redirects)
                 {
@@ -217,7 +287,8 @@ namespace SwiftDeploy.Services
                 }
             }
 
-            if (config.Headers.Any())
+            // Headers
+            if (config.Headers?.Any() == true)
             {
                 foreach (var header in config.Headers)
                 {
