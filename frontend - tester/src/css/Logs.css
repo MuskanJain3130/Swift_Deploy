@@ -1,0 +1,251 @@
+.logs {
+  display: flex; 
+  min-height: 100vh;
+  width: 100vw; 
+  background-color: #2c004f; 
+  font-family: 'Inter', sans-serif;
+  padding-left: var(--sidebar-width);
+}
+
+.background-2 {
+  flex: 1; 
+  display: flex;
+  flex-direction: column;
+  position: relative;
+  overflow: hidden; 
+}
+
+.background-4 {
+  position: absolute;
+  top: 0;
+  left: 0;
+  width: 100%;
+  height: 100%;
+  background: radial-gradient(
+      50% 50% at 65% 39%,
+      rgba(123, 66, 246, 0.3) 0%,
+      rgba(123, 66, 246, 0) 50%
+    ),
+    radial-gradient(
+      50% 50% at 35% 61%,
+      rgba(90, 0, 155, 0.4) 0%,
+      rgba(90, 0, 155, 0) 50%
+    ),
+    radial-gradient(
+      50% 50% at 50% 50%,
+      rgba(150, 50, 250, 0.2) 0%,
+      rgba(150, 50, 250, 0) 60%
+    ),
+    linear-gradient(0deg, rgba(16, 1, 28, 1) 0%, rgba(16, 1, 28, 1) 100%);
+  z-index: 1; 
+}
+
+.deployment-container {
+  position: relative; 
+  z-index: 10; 
+  flex: 1; 
+  display: flex;
+  flex-direction: column;
+  color: #ffffff;
+  padding-left: 32px; 
+  padding-right: 32px;
+  overflow-x: hidden;
+}
+
+.deployment-header {
+  padding: 24px 0; 
+  border-bottom: 1px solid rgba(255, 255, 255, 0.1);
+}
+
+.project-info {
+  display: flex;
+  align-items: center;
+  margin-bottom: 20px;
+}
+
+.back-arrow {
+  color: #8b7ba7;
+  margin-right: 16px;
+  cursor: pointer;
+  transition: color 0.2s ease;
+}
+
+.back-arrow:hover {
+  color: #ffffff;
+}
+
+.project-name {
+  font-size: 24px;
+  font-weight: 600;
+  margin: 0 12px 0 0;
+  color: #ffffff;
+}
+
+.react-tag {
+  background: #7c3aed;
+  color: #ffffff;
+  padding: 4px 12px;
+  border-radius: 16px;
+  font-size: 12px;
+  font-weight: 600;
+  text-transform: uppercase;
+}
+
+.deployment-status {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  flex-wrap: wrap; 
+  gap: 12px; 
+}
+
+.status-badge {
+  padding: 8px 16px;
+  border-radius: 20px;
+  font-size: 14px;
+  font-weight: 600;
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+
+.status-badge.success {
+  background: #16a34a;
+  color: #ffffff;
+}
+
+.action-buttons {
+  display: flex;
+  gap: 12px;
+  flex-wrap: wrap; 
+}
+
+.retry-btn, .dashboard-btn {
+  padding: 10px 20px;
+  border-radius: 8px;
+  font-size: 14px;
+  font-weight: 500;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  border: none;
+  color: #ffffff;
+}
+
+.retry-btn {
+  background: #7c3aed;
+}
+
+.retry-btn:hover {
+  background: #6d28d9;
+}
+
+.dashboard-btn {
+  background: #6366f1;
+}
+
+.dashboard-btn:hover {
+  background: #5856eb;
+}
+
+.logs-container {
+  padding: 24px 0;
+  opacity: 1;
+  transition: opacity 0.3s ease;
+  flex: 1; 
+  overflow-y: auto; 
+}
+
+.log-section {
+  margin-bottom: 24px;
+}
+
+.log-section-header {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: 600;
+  color: #8b7ba7;
+  cursor: pointer;
+  padding: 8px 0;
+  transition: color 0.2s ease;
+  text-transform: uppercase;
+  letter-spacing: 0.5px;
+}
+
+.log-section-header:hover {
+  color: #ffffff;
+}
+
+.log-entries {
+  margin-left: 24px;
+  margin-top: 8px;
+}
+
+.log-entry {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  padding: 6px 0;
+  font-family: 'Monaco', 'Menlo', 'Ubuntu Mono', monospace;
+  font-size: 13px;
+  line-height: 1.4;
+}
+
+.log-type {
+  font-weight: 600;
+  min-width: 70px;
+}
+
+.log-entry.log-info .log-type {
+  color: #60a5fa;
+}
+
+.log-entry.log-success .log-type {
+  color: #34d399;
+}
+
+.log-entry.log-warn .log-type {
+  color: #fbbf24;
+}
+
+.log-message {
+  color: #d1d5db;
+}
+
+.log-link {
+  color: #60a5fa;
+  text-decoration: underline;
+  cursor: pointer;
+}
+
+.log-link:hover {
+  color: #93c5fd;
+}
+
+/* Responsive Design */
+@media (max-width: 768px) {
+  .deployment-container {
+    padding-left: 16px;
+    padding-right: 16px;
+  }
+
+  .deployment-header {
+    padding: 16px 0; 
+  }
+
+  .deployment-status {
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 12px;
+  }
+
+  .action-buttons {
+    width: 100%;
+    justify-content: flex-start;
+  }
+
+  .logs-container {
+    padding: 16px 0; /* Adjusted padding */
+  }
+}

@@ -1,0 +1,121 @@
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.csproj.AssemblyReference.cache
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.GeneratedMSBuildEditorConfig.editorconfig
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.AssemblyInfoInputs.cache
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.AssemblyInfo.cs
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.csproj.CoreCompileInputs.cache
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.MvcApplicationPartsAssemblyInfo.cs
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.MvcApplicationPartsAssemblyInfo.cache
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.sourcelink.json
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\appsettings.Development.json
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\appsettings.json
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.exe
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.deps.json
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.runtimeconfig.json
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.dll
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.pdb
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.OpenApi.dll
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.build.json
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.development.json
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets\msbuild.SwiftDeploy.Microsoft.AspNetCore.StaticWebAssets.props
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets\msbuild.build.SwiftDeploy.props
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets\msbuild.buildMultiTargeting.SwiftDeploy.props
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets\msbuild.buildTransitive.SwiftDeploy.props
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.pack.json
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\scopedcss\bundle\SwiftDeploy.styles.css
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDep.E9C7CFF3.Up2Date
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.dll
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\refint\SwiftDeploy.dll
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.pdb
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.genruntimeconfig.cache
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\ref\SwiftDeploy.dll
+D:\Sem 7 project\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Octokit.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\appsettings.Development.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\appsettings.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.staticwebassets.endpoints.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.exe
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.deps.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.runtimeconfig.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.pdb
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.OpenApi.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Octokit.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.csproj.AssemblyReference.cache
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.GeneratedMSBuildEditorConfig.editorconfig
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.AssemblyInfoInputs.cache
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.AssemblyInfo.cs
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.csproj.CoreCompileInputs.cache
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.MvcApplicationPartsAssemblyInfo.cs
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.MvcApplicationPartsAssemblyInfo.cache
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.sourcelink.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\scopedcss\bundle\SwiftDeploy.styles.css
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.build.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.development.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.build.endpoints.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.upToDateCheck.txt
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDep.E9C7CFF3.Up2Date
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\refint\SwiftDeploy.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.pdb
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.genruntimeconfig.cache
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\ref\SwiftDeploy.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Abstractions.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.JsonWebTokens.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Logging.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Tokens.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\rpswa.dswa.cache.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\rjimswa.dswa.cache.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\rjsmrazor.dswa.cache.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\rjsmcshtml.dswa.cache.json
+D:\SwiftDeploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.build.json.cache
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\appsettings.Development.json
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\appsettings.json
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.exe
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.deps.json
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.runtimeconfig.json
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\SwiftDeploy.pdb
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.AspNetCore.Authentication.JwtBearer.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Abstractions.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.JsonWebTokens.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Logging.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Protocols.OpenIdConnect.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.IdentityModel.Tokens.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Microsoft.OpenApi.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Octokit.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Swashbuckle.AspNetCore.Swagger.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerGen.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\Swashbuckle.AspNetCore.SwaggerUI.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\bin\Debug\net8.0\System.IdentityModel.Tokens.Jwt.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.csproj.AssemblyReference.cache
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.GeneratedMSBuildEditorConfig.editorconfig
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.AssemblyInfoInputs.cache
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.AssemblyInfo.cs
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.csproj.CoreCompileInputs.cache
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.MvcApplicationPartsAssemblyInfo.cs
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.MvcApplicationPartsAssemblyInfo.cache
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.sourcelink.json
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.build.json
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.development.json
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets\msbuild.SwiftDeploy.Microsoft.AspNetCore.StaticWebAssets.props
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets\msbuild.build.SwiftDeploy.props
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets\msbuild.buildMultiTargeting.SwiftDeploy.props
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets\msbuild.buildTransitive.SwiftDeploy.props
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\staticwebassets.pack.json
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\scopedcss\bundle\SwiftDeploy.styles.css
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDep.E9C7CFF3.Up2Date
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\refint\SwiftDeploy.dll
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.pdb
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\SwiftDeploy.genruntimeconfig.cache
+C:\DESKTOP\Sem 7\Project\SwiftDeploy1\Swift_Deploy\backend\SwiftDeploy\SwiftDeploy\obj\Debug\net8.0\ref\SwiftDeploy.dll

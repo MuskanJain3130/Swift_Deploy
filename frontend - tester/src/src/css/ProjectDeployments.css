@@ -1,0 +1,14 @@
+.deployment-config {
+    background: radial-gradient(ellipse 106% 121% at 20% 80%, rgba(123, 66, 246, 0.30) 0%, rgba(123, 66, 246, 0) 50%),
+                radial-gradient(ellipse 106% 121% at 80% 20%, rgba(90, 0, 155, 0.40) 0%, rgba(90, 0, 155, 0) 50%),
+                radial-gradient(ellipse 66% 75% at 50% 50%, rgba(150, 50, 250, 0.20) 0%, rgba(150, 50, 250, 0) 60%),
+                #10011C;
+  }
+  
+  .deployment-card {
+    background-color: #3A006B;
+    border: 1px solid #4A007F;
+    border-radius: 14px;
+    color: #CCCCCC;
+  }
+  

@@ -6,11 +6,13 @@ using SwiftDeploy.Services;
 using System.Linq;
 using System.Threading.Tasks;
 using SwiftDeploy.Models;
+using Microsoft.AspNetCore.Authorization;
 
 namespace SwiftDeploy.Controllers
 {
     [Route("api/[controller]")]
     [ApiController]
+    [Authorize]
     public class RepositoriesController : ControllerBase
     {
         private readonly GitHubClient _githubClient;

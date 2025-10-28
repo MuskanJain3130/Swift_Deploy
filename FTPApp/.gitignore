@@ -1,0 +1,55 @@
+# Build artifacts
+bin/
+obj/
+[Bb]uild/
+[Bb]uild[Ll]og.*
+
+# User-specific files
+*.user
+*.suo
+*.userosscache
+*.sln.docstates
+
+# IDE settings
+.vscode/
+.idea/
+*.code-workspace
+
+# Visual Studio for Mac
+*.pidb
+*.userprefs
+
+# Xamarin/MAUI specific
+*.apk
+*.apks
+*.aab
+*.ipa
+*.app
+*.xcuserstate
+*.xcworkspace
+*.xcconfig
+*.DS_Store
+*.pdb
+*.mdb
+
+# Platform-specific output
+**/platforms/android/app/build/
+**/platforms/ios/build/
+**/platforms/maccatalyst/build/
+**/platforms/windows/bin/
+**/platforms/windows/obj/
+
+# NuGet packages
+*.nupkg
+*.snupkg
+packages/
+.nuget/
+
+# Logs and crash reports
+*.log
+CrashReports/
+
+# Configuration
+global.json
+Directory.Build.props
+Directory.Build.targets

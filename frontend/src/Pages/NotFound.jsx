@@ -5,8 +5,8 @@ function NotFound() {
   const navigate = useNavigate();
   const handleHome = () => {navigate("/");};
   return (
-    <div className="background d-flex justify-content-center align-items-center w-100 h-100">
-      <div className="overlay-border rounded-3 w-50 h-50 py-5">
+    <div className="background d-flex justify-content-center align-items-center w-100 h-100 px-5">
+      <div className="overlay-border rounded-3 w-50 h-50 p-5">
         <span className="display-1 fw-bold text-center text-white" >
           404
         </span>
@@ -17,7 +17,7 @@ function NotFound() {
           Sorry, we couldn't find the page you’re looking for.
         </span>
         <button
-          className="btn btn-lg 
+          className="btn btn-sm
           btn-purple text-white fw-bold"
           onClick={handleHome}
         >

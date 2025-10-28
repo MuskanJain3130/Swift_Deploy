@@ -1,0 +1,21 @@
+body {
+  overscroll-behavior-y: none;
+  overscroll-behavior-x: none;
+
+  /* hides scrollbar in IE and Edge */
+  -ms-overflow-style: none;
+
+  /* hides scrollbar in Firefox */
+  scrollbar-width: none;
+
+  /* keeps scroll functionality */
+  overflow-y: scroll;
+}
+
+/* For Chrome, Safari, Opera */
+body::-webkit-scrollbar {
+  display: none;
+}
+html, body {
+  height: 100%;
+}
