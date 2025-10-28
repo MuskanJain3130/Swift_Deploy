@@ -1,0 +1,220 @@
+.landing-bg {
+  min-height: 100vh;
+  background: radial-gradient(
+    50% 50% at 50% 50%,
+    rgba(0, 0, 0, 0) 0%,
+    rgba(16, 1, 28, 1) 100%
+  ), linear-gradient(0deg, rgba(32, 0, 58, 1) 0%, rgba(32, 0, 58, 1) 100%);
+  display: flex;
+  flex-direction: column;
+}
+
+.landing-main {
+  flex: 1;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  padding: 40px 20px 0 20px;
+}
+
+.landing-title {
+  color: #fff;
+  font-size: 2.8rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 48px;
+  line-height: 1.2;
+}
+
+.features-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  justify-content: center;
+  margin-bottom: 40px;
+}
+
+.feature-card {
+  background: rgba(44, 0, 77, 0.85);
+  border-radius: 18px;
+  box-shadow: 0 4px 24px 0 rgba(0,0,0,0.18);
+  padding: 36px 28px 28px 28px;
+  width: 300px;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  color: #fff;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+
+.feature-card:hover {
+  transform: translateY(-8px) scale(1.03);
+  box-shadow: 0 8px 32px 0 rgba(0,0,0,0.28);
+}
+
+.feature-icon {
+  font-size: 2.6rem;
+  color: #a259ff;
+  margin-bottom: 18px;
+}
+
+.feature-title {
+  font-size: 1.3rem;
+  font-weight: 600;
+  margin-bottom: 12px;
+  text-align: center;
+}
+
+.feature-desc {
+  font-size: 1rem;
+  color: #e0d7f7;
+  text-align: center;
+  line-height: 1.5;
+}
+
+/* How It Works Section */
+.how-works-section {
+  margin: 60px 0 60px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+
+.how-works-title {
+  color: #fff;
+  font-size: 2.2rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 44px;
+}
+
+.how-works-row {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 32px;
+  justify-content: center;
+}
+
+/* Removed how-works-card, how-works-icon, how-works-card-title, how-works-card-desc classes as feature-card classes are used directly */
+
+/* Why Choose SwiftDeploy Section */
+.why-choose-section {
+  margin: 70px 0 0 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.why-choose-title {
+  color: #fff;
+  font-size: 2.2rem;
+  font-weight: 700;
+  text-align: center;
+  margin-bottom: 44px;
+}
+.why-choose-row {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 32px;
+  justify-items: center;
+  margin-bottom: 60px;
+}
+.why-choose-row .feature-card {
+  width: 300px;
+}
+@media (max-width: 1200px) {
+  .why-choose-row {
+    grid-template-columns: repeat(2, 1fr);
+  }
+}
+@media (max-width: 800px) {
+  .why-choose-row {
+    grid-template-columns: 1fr;
+  }
+}
+
+.cta-section {
+  margin: 60px 0 60px 0;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+}
+.cta-title {
+  color: #fff;
+  font-size: 2rem;
+  font-weight: 600;
+  text-align: center;
+  margin-bottom: 28px;
+}
+.cta-btn {
+  background: #7c4dff;
+  color: #fff;
+  border: none;
+  border-radius: 8px;
+  padding: 14px 36px;
+  font-size: 1.1rem;
+  font-weight: 600;
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  transition: background 0.2s, box-shadow 0.2s;
+  box-shadow: 0 2px 12px 0 rgba(124,77,255,0.18);
+}
+.cta-btn:hover {
+  background: #a259ff;
+  box-shadow: 0 4px 24px 0 rgba(124,77,255,0.28);
+}
+
+@media (max-width: 1000px) {
+  .features-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 24px;
+  }
+  .feature-card {
+    width: 90vw;
+    max-width: 350px;
+  }
+  .how-works-row {
+    flex-direction: column;
+    align-items: center;
+    gap: 22px;
+  }
+  .feature-card {
+    width: 90vw;
+    max-width: 340px;
+  }
+  .why-choose-row {
+    grid-template-columns: 1fr;
+    gap: 20px;
+  }
+}
+
+@media (max-width: 700px) {
+  .landing-title, .how-works-title, .why-choose-title, .cta-title {
+    font-size: 1.3rem;
+    margin-bottom: 24px;
+  }
+  .feature-card {
+    padding: 22px 10px 18px 10px;
+    width: 98vw;
+    max-width: 99vw;
+  }
+  .feature-title, .feature-desc {
+    font-size: 0.98rem;
+  }
+  .feature-icon {
+    font-size: 2rem;
+    margin-bottom: 10px;
+  }
+  .cta-btn {
+    font-size: 1rem;
+    padding: 10px 18px;
+  }
+  .cta-section {
+    margin: 40px 0 40px 0;
+  }
+  .how-works-section, .why-choose-section {
+    margin: 40px 0 0 0;
+  }
+}

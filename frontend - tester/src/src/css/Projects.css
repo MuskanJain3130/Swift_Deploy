@@ -1,0 +1,275 @@
+:root {
+  /* Global variables for consistency */
+  --content-padding: 2rem; /* 32px equivalent */
+  --sidebar-width: 5rem;   /* From your navbar CSS */
+}
+
+/* Page container beside fixed nav */
+.projects-page {
+  display: flex;
+  min-height: 100vh;
+  background: #19102a;
+}
+
+/* Main content area */
+.projects-main {
+  flex: 1;
+  margin-left: var(--sidebar-width); /* match navbar width */
+  padding: var(--content-padding);
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+}
+
+/* Header row */
+.header-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 1.75rem; /* 28px */
+}
+
+.header-row h2 {
+  font-size: 1.6rem;
+  font-weight: 600;
+}
+
+/* New Project button */
+.new-project-btn {
+  background: #8462fc;
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem; /* 8px */
+  padding: 0.625rem 1.375rem; /* 10px 22px */
+  font-size: 1rem;
+  cursor: pointer;
+  transition: background 0.2s;
+}
+.new-project-btn:hover {
+  background: #6a4bd6;
+}
+
+/* Projects Grid */
+.projects-grid {
+  display: grid;
+  grid-template-columns: repeat(auto-fit, minmax(20rem, 1fr)); /* 320px min width */
+  gap: 1.5rem; /* 24px */
+}
+
+/* Project cards */
+.project-card {
+  background: #2b1858;
+  border-radius: 1rem; /* 16px */
+  box-shadow: 0 0 0.5rem #1b073b30;
+  padding: 1.375rem 1.25rem 1.125rem 1.25rem; /* rem-based spacing */
+  display: flex;
+  flex-direction: column;
+}
+
+.project-title {
+  font-size: 1.2rem;
+  font-weight: 600;
+  margin-bottom: 0.3rem; /* 5px */
+}
+
+.project-desc {
+  color: #d1caf6;
+  font-size: 1rem;
+  margin-bottom: 0.625rem; /* 10px */
+}
+
+/* Card bottom info row */
+.project-info-row {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  color: #bba6ff;
+  font-size: 0.98rem;
+}
+
+/* Responsive */
+@media (max-width: 50rem) { /* 800px */
+  .projects-grid {
+    grid-template-columns: repeat(auto-fit, minmax(16rem, 1fr)); /* 256px */
+  }
+}
+
+/* -------- Modal Styles -------- */
+/* Dark overlay (starts next to navbar) */
+.modal-overlay {
+  position: fixed;
+  top: 0;
+  left: var(--sidebar-width);
+  width: calc(100% - var(--sidebar-width));
+  height: 100vh;
+  background: rgba(0, 0, 0, 0.6);
+  display: flex;
+  justify-content: center;
+  align-items: flex-start; /* start alignment, so we can move card up */
+  padding-top: 5vh; /* pushes modal down a bit from very top */
+  z-index: 100;
+}
+
+/* Modal card box - wider + moved slightly upward */
+/* Modal card - BIGGER */
+.modal-card {
+  background: #2b1858;
+  padding: 2.5rem; /* more padding inside */
+  border-radius: 1rem;
+  width: 100%;
+  max-width: 42rem; /* was 35rem — wider modal (~672px) */
+  min-height: 16rem; /* give extra height baseline */
+  color: #fff;
+  display: flex;
+  flex-direction: column;
+  gap: 1.5rem;
+  position: relative;
+  animation: fadeInUp 0.25s ease-out;
+}
+
+/* Smooth upward entry animation */
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(30px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+/* Dropdown styled with same color scheme and scrollable */
+.modal-card select {
+  height: 2rem; /* force a smaller closed height */
+  padding: 0 0.8rem; /* remove extra vertical padding */
+  border-radius: 0.4rem;
+  border: none;
+  font-size: 1rem; /* bigger text for repo names */
+  font-weight: 500;
+  background-color: #2b1858; /* matches modal background */
+  color: #fff;
+  outline: none;
+  appearance: none;
+  border: 1px solid #8462fc;
+  line-height: 1.2;
+  cursor: pointer;
+
+  /* Limit visible list height to about 2–3 repos before scroll */
+  max-height: 6rem;
+  overflow-y: auto;
+}
+
+/* Custom scrollbar styling (optional) */
+.modal-card select::-webkit-scrollbar {
+  width: 0.4rem;
+}
+.modal-card select::-webkit-scrollbar-thumb {
+  background: #8462fc;
+  border-radius: 0.25rem;
+}
+
+.modal-card select:hover,
+.modal-card select:focus {
+  background-color: #241347; /* darker tone of purple */
+  border-color: #6a4bd6;
+}
+
+/* Modal buttons */
+.modal-buttons {
+  display: flex;
+  justify-content: flex-end;
+  gap: 1rem;
+}
+
+.modal-buttons button {
+  background: #8462fc;
+  color: #fff;
+  border: none;
+  border-radius: 0.5rem;
+  padding: 0.5rem 1.2rem;
+  cursor: pointer;
+  font-size: 1rem;
+  transition: background 0.2s ease, transform 0.1s ease;
+}
+
+.modal-buttons button:hover:not(:disabled) {
+  background: #6a4bd6;
+}
+
+.modal-buttons button:active {
+  transform: translateY(2px); /* pressed effect */
+}
+
+.modal-buttons button:disabled {
+  background: #bba6ff88;
+  cursor: not-allowed;
+}
+
+.error-text {
+  color: #ff6b6b;
+}
+
+/* ----- Custom Dropdown ----- */
+.custom-dropdown {
+  position: relative;
+  width: 100%;
+  max-width: 28rem; /* slightly wider dropdown box */
+  font-size: 1.05rem; /* text slightly bigger */
+  color: #fff;
+}
+
+/* Selected dropdown box */
+.dropdown-selected {
+  background: #2b1858;
+  border: 1px solid #8462fc;
+  border-radius: 0.5rem;
+  padding: 0.6rem 1rem; /* taller input area */
+  min-height: 2.4rem; /* was ~2rem, increased */
+  cursor: pointer;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+
+.dropdown-selected:hover {
+  background: #241347;
+}
+
+/* Arrow remains */
+.dropdown-arrow {
+  font-size: 0.9rem;
+  pointer-events: none;
+}
+
+/* Dropdown list */
+.dropdown-list {
+  position: absolute;
+  top: 110%;
+  left: 0;
+  width: 100%;
+  background: #2b1858;
+  border: 1px solid #8462fc;
+  border-radius: 0.5rem;
+  max-height: 12rem; /* still ~3-4 items visible */
+  overflow-y: auto;
+  z-index: 200;
+}
+
+/* Dropdown items - bigger clickable area */
+.dropdown-item {
+  padding: 0.6rem 1rem; /* taller rows */
+  font-size: 1.05rem;
+  cursor: pointer;
+}
+.dropdown-item:hover {
+  background: #241347;
+}
+/* Custom scrollbar */
+.dropdown-list::-webkit-scrollbar {
+  width: 0.4rem;
+}
+.dropdown-list::-webkit-scrollbar-thumb {
+  background: #8462fc;
+  border-radius: 0.25rem;
+}
