@@ -1,2 +1,7 @@
 # Visual Studio workspace
 .vs/
+
+# Add to .gitignore if not already present
+SwiftDeploy/appsettings.Development.json
+SwiftDeploy/appsettings.Production.json
+SwiftDeploy/appsettings.*.json
