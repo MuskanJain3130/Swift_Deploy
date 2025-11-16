@@ -53,7 +53,7 @@ function CompleteProfile() {
 
     try {
       await axios.post(
-        "http://localhost:5280/api/User/complete-profile",
+        "http://localhost:5280/api/user/complete-profile",
         {
           Username: formData.username,
           Password: formData.password,
