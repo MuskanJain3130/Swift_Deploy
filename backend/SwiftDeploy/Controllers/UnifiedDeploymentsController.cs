@@ -21,6 +21,8 @@ namespace SwiftDeploy.Controllers
         private readonly ILogger<UnifiedDeploymentController> _logger;
         private static readonly ConcurrentDictionary<string, ProjectInfo> _projects = new();
         private readonly IConfiguration _configuration;
+        IHttpContextAccessor _httpContextAccessor; // ADD THIS
+
         // Remove this line:
         private readonly TokenService _tokenService;
 
@@ -29,13 +31,16 @@ namespace SwiftDeploy.Controllers
             ITemplateEngine templateEngine,
             IConfiguration configuration,
             TokenService tokenService,
-            ILogger<UnifiedDeploymentController> logger)
+            ILogger<UnifiedDeploymentController> logger,
+                IHttpContextAccessor httpContextAccessor // ADD THIS
+)
         {
             _deploymentService = deploymentService;
             _templateEngine = templateEngine;
             _configuration = configuration;
             _tokenService = tokenService;
             _logger = logger;
+            _httpContextAccessor = httpContextAccessor;
         }
 
         [HttpPost("deploy-without-github")]
@@ -217,22 +222,17 @@ namespace SwiftDeploy.Controllers
 
             try
             {
-                // Get user ID from auth
-                var authToken = HttpContext.Request.Headers["Authorization"].FirstOrDefault();
-
-               
-                // Get platform token (header or database)
-                var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
-
-                if (string.IsNullOrEmpty(platformToken))
-                    return BadRequest($"No {request.Platform} token found. Please connect your {request.Platform} account.");
-
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
                 var supportedPlatforms = new[] { "vercel", "cloudflare", "netlify" };
                 if (!supportedPlatforms.Contains(request.Platform.ToLower()))
                     return BadRequest($"Unsupported platform: {request.Platform}");
+
+                // Get platform token
+                var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
+                if (string.IsNullOrEmpty(platformToken))
+                    return BadRequest($"No {request.Platform} token found. Please connect your {request.Platform} account.");
 
                 // Initialize project tracking
                 var projectInfo = new ProjectInfo
@@ -251,43 +251,41 @@ namespace SwiftDeploy.Controllers
 
                 _logger.LogInformation($"Starting GitHub deployment for {request.GitHubRepo} on {request.Platform}");
 
-                // Step 1: Generate and push config to user's repo
-                await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating deployment configuration...");
+                // Step 1: Generate and save config using the shared service method
+                await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating and saving configuration...");
 
-                var configContent = await _templateEngine.GenerateConfigAsync(request.Platform, request.Config);
-                var fileName = _templateEngine.GetConfigFileName(request.Platform);
-
-                // Push config to user's GitHub repo
                 var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
-                var configResult = await gitHubService.SaveFileToRepoAsync(
+                var configResult = await gitHubService.GenerateAndSaveConfigAsync(
+                    request.Platform,
                     request.GitHubRepo,
-                    fileName,
-                    configContent,
-                    $"Add {request.Platform} configuration via SwiftDeploy",
+                    request.GitHubToken,
                     request.Branch ?? "main",
-                    request.GitHubToken
+                    request.Config
                 );
 
                 if (!configResult.Success)
                 {
-                    await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, $"Failed to push config: {configResult.Message}");
+                    await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed,
+                        $"Failed to save config: {configResult.Message}");
+
                     return BadRequest(new DeploymentResponse
                     {
                         Success = false,
-                        Message = configResult.Message,
+                        Message = $"Failed to save config to GitHub: {configResult.Message}",
                         ProjectId = projectId,
+                        GitHubRepoUrl = projectInfo.GitHubRepoUrl,
                         Status = DeploymentStatus.Failed
                     });
                 }
 
-                // Step 2: Deploy to platform using existing controllers logic
+                // Step 2: Deploy to platform
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Deploying, $"Deploying to {request.Platform}...");
 
                 DeploymentResponse deploymentResult = request.Platform.ToLower() switch
                 {
-                    "cloudflare" => await DeployToCloudflareWithConfig(request.GitHubRepo, request.Branch ?? "main", request.Config),
-                    "netlify" => await DeployToNetlifyWithConfig(request.GitHubRepo, request.Branch ?? "main", request.Config),
-                    "vercel" => await DeployToVercelWithConfig(request.GitHubRepo, request.Branch ?? "main", request.Config),
+                    "cloudflare" => await DeployToCloudflareWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, request.GitHubToken),
+                    "netlify" => await DeployToNetlifyWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, request.GitHubToken),
+                    "vercel" => await DeployToVercelWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, request.GitHubToken),
                     _ => throw new ArgumentException($"Unsupported platform: {request.Platform}")
                 };
 
@@ -328,6 +326,8 @@ namespace SwiftDeploy.Controllers
                 });
             }
         }
+        
+        
         [HttpGet("projects")]
         public async Task<IActionResult> GetUserProjects([FromQuery] string userId = null)
         {
@@ -475,7 +475,6 @@ namespace SwiftDeploy.Controllers
                 };
             }
         }
-
         // Helper function for Netlify deployment
         private async Task<DeploymentResponse> DeployToNetlifyWithConfig(string repoPath, string branch, CommonConfig config)
         {
@@ -672,6 +671,223 @@ namespace SwiftDeploy.Controllers
                 _logger.LogError(ex, $"Error regenerating config for project {projectId}");
                 return StatusCode(500, "Error regenerating configuration");
             }
+        }// Add these methods at the end of your UnifiedDeploymentController class
+
+        // Deploy to Netlify using USER'S GitHub repo
+        // In UnifiedDeploymentController, replace DeployToNetlifyWithUserRepo method:
+
+        private async Task<DeploymentResponse> DeployToNetlifyWithUserRepo(string repoPath, string branch, CommonConfig config, string netlifyToken, string githubToken)
+        {
+            try
+            {
+                _logger.LogInformation($"Calling existing Netlify deployment endpoint for {repoPath}");
+
+                // Get GitHub token from cookies
+                var GithubToken = githubToken ?? _httpContextAccessor.HttpContext.Request.Cookies["GitHubAccessToken"];
+                if (string.IsNullOrEmpty(githubToken))
+                {
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = "GitHub token not found. Please authenticate with GitHub first."
+                    };
+                }
+
+                using var client = new HttpClient();
+
+                // Set cookies for the internal request
+                var cookieContainer = new System.Net.CookieContainer();
+                var handler = new HttpClientHandler { CookieContainer = cookieContainer };
+                using var clientWithCookies = new HttpClient(handler);
+
+                // Add cookies
+                var baseUri = new Uri($"{Request.Scheme}://{Request.Host}");
+                cookieContainer.Add(baseUri, new System.Net.Cookie("NetlifyAccessToken", netlifyToken));
+                cookieContainer.Add(baseUri, new System.Net.Cookie("GitHubAccessToken", GithubToken));
+
+                // Add authorization header if user is authenticated
+                var authHeader = _httpContextAccessor.HttpContext.Request.Headers["Authorization"].ToString();
+                if (!string.IsNullOrEmpty(authHeader))
+                {
+                    clientWithCookies.DefaultRequestHeaders.Add("Authorization", authHeader);
+                }
+
+                // Call the existing endpoint
+                var deployPayload = new
+                {
+                    Repo = repoPath,
+                    Branch = branch
+                };
+
+                var response = await clientWithCookies.PostAsJsonAsync(
+                    $"{Request.Scheme}://{Request.Host}/api/netlify/deploy",
+                    deployPayload
+                );
+
+                var responseBody = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    var result = JsonSerializer.Deserialize<JsonElement>(responseBody);
+                    var siteUrl = result.GetProperty("site_url").GetString();
+
+                    return new DeploymentResponse
+                    {
+                        Success = true,
+                        Message = "Netlify deployment started successfully",
+                        DeploymentUrl = siteUrl
+                    };
+                }
+                else
+                {
+                    _logger.LogError($"Netlify deployment failed: {responseBody}");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"Netlify deployment failed: {responseBody}"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calling Netlify deployment endpoint");
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = $"Netlify deployment error: {ex.Message}"
+                };
+            }
         }
-    }
-}
+        private async Task<DeploymentResponse> DeployToCloudflareWithUserRepo(string repoPath, string branch, CommonConfig config, string cloudflareToken,string githubToken)
+        {
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cloudflareToken);
+
+                // Get account ID
+                var userResponse = await client.GetAsync("https://api.cloudflare.com/client/v4/accounts");
+                var userString = await userResponse.Content.ReadAsStringAsync();
+                if (!userResponse.IsSuccessStatusCode)
+                    throw new Exception($"Failed to get Cloudflare account: {userString}");
+
+                var userJson = JsonDocument.Parse(userString);
+                string accountId = userJson.RootElement.GetProperty("result")[0].GetProperty("id").GetString();
+
+                // Generate project name
+                string projectName = GenerateCloudflareProjectName(repoPath, branch);
+
+                // Split repo path (e.g., "tamannashah18/Test-Repository-static")
+                var repoParts = repoPath.Split('/');
+                var owner = repoParts[0];
+                var repoName = repoParts[1];
+
+                // Create project
+                var createProjectUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects";
+                var createPayload = new
+                {
+                    name = projectName,
+                    production_branch = branch,
+                    source = new
+                    {
+                        type = "github",
+                        config = new
+                        {
+                            owner = owner,
+                            repo_name = repoName,
+                            production_branch = branch
+                        }
+                    },
+                    build_config = new
+                    {
+                        build_command = config.BuildCommand ?? "",
+                        destination_dir = config.OutputDirectory ?? ".",
+                        root_dir = ""
+                    }
+                };
+
+                var createContent = new StringContent(JsonSerializer.Serialize(createPayload), System.Text.Encoding.UTF8, "application/json");
+                var createResponse = await client.PostAsync(createProjectUrl, createContent);
+                var createResult = await createResponse.Content.ReadAsStringAsync();
+
+                if (!createResponse.IsSuccessStatusCode)
+                    throw new Exception($"Cloudflare project creation failed: {createResult}");
+
+                var createData = JsonDocument.Parse(createResult);
+                var deploymentUrl = createData.RootElement.GetProperty("result").GetProperty("subdomain").GetString() + ".pages.dev";
+
+                // Trigger deployment
+                var deployUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects/{projectName}/deployments";
+                var deployResponse = await client.PostAsync(deployUrl, new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+
+                return new DeploymentResponse
+                {
+                    Success = deployResponse.IsSuccessStatusCode,
+                    Message = deployResponse.IsSuccessStatusCode ? "Cloudflare deployment started successfully" : "Cloudflare deployment failed",
+                    DeploymentUrl = $"https://{deploymentUrl}"
+                };
+            }
+            catch (Exception ex)
+            {
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = $"Cloudflare deployment error: {ex.Message}"
+                };
+            }
+        }
+
+        private async Task<DeploymentResponse> DeployToVercelWithUserRepo(string repoPath, string branch, CommonConfig config, string vercelToken, string githubToken)
+        {
+            try
+            {
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", vercelToken);
+
+                // Split repo path (e.g., "tamannashah18/Test-Repository-static")
+                var repoParts = repoPath.Split('/');
+                var owner = repoParts[0];
+                var repoName = repoParts[1];
+
+                var payload = new
+                {
+                    name = $"swiftdeploy-{Guid.NewGuid().ToString()[..8]}",
+                    gitSource = new
+                    {
+                        type = "github",
+                        repo = repoPath,
+                        ref_ = branch
+                    },
+                    buildCommand = config.BuildCommand ?? "",
+                    outputDirectory = config.OutputDirectory ?? ".",
+                    installCommand = config.InstallCommand ?? "npm install"
+                };
+
+                var deployResponse = await client.PostAsJsonAsync("https://api.vercel.com/v13/deployments", payload);
+                var body = await deployResponse.Content.ReadAsStringAsync();
+
+                if (!deployResponse.IsSuccessStatusCode)
+                    throw new Exception($"Vercel deployment failed: {body}");
+
+                var data = JsonDocument.Parse(body);
+                var deploymentUrl = data.RootElement.GetProperty("url").GetString();
+
+                return new DeploymentResponse
+                {
+                    Success = true,
+                    Message = "Vercel deployment started successfully",
+                    DeploymentUrl = $"https://{deploymentUrl}"
+                };
+            }
+            catch (Exception ex)
+            {
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = $"Vercel deployment error: {ex.Message}"
+                };
+            }
+        }
+
+    } // ← This closes the UnifiedDeploymentController class
+}     // ← This closes the namespace

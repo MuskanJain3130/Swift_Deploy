@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -131,18 +131,39 @@ namespace SwiftDeploy.Controllers
                 return StatusCode(500, new { success = false, message = ex.Message });
             }
         }
-        private async Task<Octokit.User> GetGitHubUserInfo(string accessToken)
+        private async Task<Models.User> GetGitHubUserInfo(string accessToken)
         {
             var productInformation = new ProductHeaderValue("SwiftDeploy");
             var credentials = new Credentials(accessToken); // use the token here
 
-            var client = new GitHubClient(productInformation)
+            //var client = new GitHubClient(productInformation)
+            //{
+            //    Credentials = credentials
+            //};
+
+            //var user = await client.User.Current(); // gets authenticated user
+
+            var client = new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
             {
-                Credentials = credentials
+                Credentials = new Credentials(accessToken)
             };
 
-            var user = await client.User.Current(); // gets authenticated user
-            return user;
+            var user = await client.User.Current();
+            var emails = await client.User.Email.GetAll();
+            var primaryEmail = emails.FirstOrDefault(e => e.Primary && e.Verified)?.Email;
+
+           var newuser = new Models.User
+            {
+                GithubId = user.Id.ToString(),
+                Username = user.Login,
+                Name = string.IsNullOrEmpty(user.Name) ? user.Login : user.Name,
+                Email = primaryEmail,
+                AvatarUrl = user.AvatarUrl,
+                CreatedAt = DateTime.UtcNow,
+                UpdatedAt = DateTime.UtcNow
+            };
+
+            return newuser;
         }
         [HttpPost("login/github/callback")]
         public async Task<IActionResult> GitHubOAuthCallback()
@@ -151,25 +172,24 @@ namespace SwiftDeploy.Controllers
 
             if (string.IsNullOrWhiteSpace(accessToken))
                 return BadRequest("Missing Authorization header");
-
             // Optional: strip "Bearer " prefix if present
             if (accessToken.StartsWith("Bearer "))
                 accessToken = accessToken.Substring("Bearer ".Length);
 
             var gitHubUser = await GetGitHubUserInfo(accessToken);
-
-            var user = await _mongo.Users.Find(x => x.GithubId == gitHubUser.Id.ToString()).FirstOrDefaultAsync();
+            var user = await _mongo.Users.Find(x => x.GithubId == gitHubUser.GithubId.ToString()).FirstOrDefaultAsync();
 
             if (user == null)
             {
                 user = new Models.User
                 {
                     Id = ObjectId.GenerateNewId().ToString(),
-                    GithubId = gitHubUser.Id.ToString(),
+                    GithubId = gitHubUser.GithubId.ToString(),
                     Email = gitHubUser.Email,
                     Name = gitHubUser.Name,
                     UserType = UserType.GitHub,
                     CreatedAt = DateTime.UtcNow,
+                    AvatarUrl = gitHubUser.AvatarUrl,
                     UpdatedAt = DateTime.UtcNow
                 };
                 await _mongo.Users.InsertOneAsync(user);
@@ -205,8 +225,12 @@ namespace SwiftDeploy.Controllers
 
             if (userTokens == null)
             {
-                // If no tokens document exists for user, create one
-                userTokens = new UserTokens { UserId = userId };
+                // If no tokens document exists for user, create one with a new ObjectId
+                userTokens = new UserTokens 
+                { 
+                    Id = ObjectId.GenerateNewId().ToString(),
+                    UserId = userId 
+                };
             }
 
             // Set the relevant platform token

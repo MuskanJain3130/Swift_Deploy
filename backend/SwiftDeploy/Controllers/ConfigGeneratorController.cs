@@ -73,6 +73,23 @@ namespace SwiftDeploy.Controllers
         [HttpPost("generate-and-save")]
         public async Task<IActionResult> GenerateAndSaveToGitHub([FromBody] GitHubConfigRequest request)
         {
+            //example payload
+
+            //{
+            //    "Platform": "netlify",
+            //          "GitHubRepo": "tamannashah18/Test-Repository-static",
+            //          "GitHubToken": "ghp_NEW_TOKEN_WITH_REPO_SCOPE",
+            //          "Branch": "main",
+            //          "CommitMessage": "Add Netlify configuration",
+            //          "Config": {
+            //        "ProjectName": "test-static-site",
+            //            "OutputDirectory": ".",
+            //            "ProjectType": 0,
+            //            "Framework": "static"
+            //          }
+            //}
+
+
             try
             {
                 if (!ModelState.IsValid)

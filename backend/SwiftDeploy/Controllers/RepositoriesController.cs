@@ -1,12 +1,14 @@
-﻿using Microsoft.AspNetCore.Http;
+using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using Octokit;
+using SwiftDeploy.Models;
+using SwiftDeploy.Models.SwiftDeploy.Models;
 using SwiftDeploy.Services;
 using System.Linq;
+using System.Security.Claims;
 using System.Threading.Tasks;
-using SwiftDeploy.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace SwiftDeploy.Controllers
 {
@@ -30,29 +32,32 @@ namespace SwiftDeploy.Controllers
         private bool TryAuthenticate(out string errorMessage)
         {
             errorMessage = string.Empty;
-            var authHeader = HttpContext.Request.Headers["Authorization"].FirstOrDefault();
 
-            if (authHeader == null || !authHeader.StartsWith("Bearer "))
+            // Extract user ID from JWT claims
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
             {
-                errorMessage = "Missing or invalid Authorization header.";
+                errorMessage = "User ID not found in token.";
                 return false;
             }
 
-            var token = authHeader.Substring("Bearer ".Length).Trim();
-            if (string.IsNullOrEmpty(token))
+            // Look up the GitHub token from MongoDB using UserId field
+            var userToken = _mongo.UserTokens.Find(x => x.UserId == userId).FirstOrDefault();
+            if (userToken == null || string.IsNullOrEmpty(userToken.GitHubToken))
             {
-                errorMessage = "GitHub access token not found. Please re-authenticate.";
+                errorMessage = "GitHub token not found in database. Please re-authenticate with GitHub.";
                 return false;
             }
 
-            _githubClient.Credentials = new Credentials(token);
+            // Set the GitHub token for Octokit
+            _githubClient.Credentials = new Credentials(userToken.GitHubToken);
             return true;
         }
 
         /// <summary>
         /// Gets all repositories for the authenticated user.
         /// </summary>
-        [HttpGet]
+        [HttpGet()]
         public async Task<IActionResult> GetRepositories()
         {
             if (!TryAuthenticate(out var error)) return Unauthorized(error);
