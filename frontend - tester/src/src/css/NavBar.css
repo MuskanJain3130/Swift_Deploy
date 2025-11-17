@@ -1,0 +1,62 @@
+:root {
+  /* Use root font size so everything is scalable */
+  --icon-size: 1.75rem; /* Roughly 28px on base 16px browser size */
+  --sidebar-width: 5rem; /* Responsive sidebar */
+}
+
+.nav-bg{
+  position: fixed;
+  top: 0;
+  left: 0;
+  height: 100vh;
+  width: var(--sidebar-width);
+  background-color: #2c004f;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding-top: 1.25rem;
+  z-index: 20;
+}
+
+.margin {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.875rem; /* 30px */
+  height: 100%;
+  width: 100%;
+}
+
+.container {
+  display: flex;
+  flex-direction: column;
+  justify-content: space-between;
+  align-items: center;
+  height: 100%;
+  width: 100%;
+}
+
+.top-icons,
+.bottom-icons {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 1.25rem; /* 20px */
+}
+
+.iconify-icon {
+  color: white;
+  font-size: var(--icon-size);
+  cursor: pointer;
+  transition: transform 0.2s ease, color 0.2s ease;
+}
+
+.iconify-icon:hover {
+  transform: scale(1.2);
+}
+
+.logo {
+  height: 4.625rem; /* equivalent to 74px if 1rem = 16px */
+  width: 5.25rem;   /* equivalent to 84px */
+  object-fit: contain;
+}

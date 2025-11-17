@@ -8,5 +8,7 @@ namespace SwiftDeploy.Services.Interfaces
     public interface IGitHubService
     {
         Task<GitHubSaveResult> SaveFileToRepoAsync(string repo, string filePath, string content, string commitMessage, string branch = "main", string accessToken = null);
+        // Add this new method
+        Task<GitHubSaveResult> GenerateAndSaveConfigAsync(string platform, string gitHubRepo, string gitHubToken, string branch, CommonConfig config);
     }
 }

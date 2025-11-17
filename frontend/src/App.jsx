@@ -14,6 +14,7 @@ import CompleteProfile from './Pages/CompleteProfile';
 import Login from './Pages/Login';
 import RegisterUser from './Pages/RegisterUser';
 import { useNavigate } from 'react-router-dom';
+import NetlifyCallback from './Components/NetlifyCallback';
  
 function App() {
   const AuthCallbackWrapper = () => {
@@ -30,12 +31,14 @@ function App() {
           <Route path="/header" element={<Header />} />
           <Route path="/landing" element={<Landing />} />
           <Route path="/auth-callback" element={<AuthCallbackWrapper />} />
+          <Route path="/netlify-callback" element={<NetlifyCallback />} />
           <Route path="/logs" element={<Logs a="" b={0}/>} />
           <Route path="/projects" element={<Projects />} />
           <Route path="/complete-profile/:userId" element={<CompleteProfile />} />
           <Route path="/register" element={<RegisterUser />} />
           <Route path="/profile" element={<Profile />} />
           <Route path="/login" element={<Login />} />
+
 
         </Routes>
       </Router>

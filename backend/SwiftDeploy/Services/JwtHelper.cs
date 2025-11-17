@@ -29,13 +29,18 @@ namespace SwiftDeploy.Services
                 new Claim("UserType", user.UserType.ToString())
             };
 
+            var expiresInHours = Convert.ToDouble(_configuration["Jwt:ExpiryInHours"]);
             var token = new JwtSecurityToken(
                 issuer: _configuration["Jwt:Issuer"],
                 audience: _configuration["Jwt:Audience"],
                 claims: claims,
-                expires: DateTime.UtcNow.AddHours(Convert.ToDouble(_configuration["Jwt:ExpiryInHours"])),
+                notBefore: DateTime.UtcNow,
+                expires: DateTime.UtcNow.AddHours(expiresInHours),
                 signingCredentials: credentials
             );
+
+            // Log token details for debugging
+            Console.WriteLine($"Generated JWT token. Expires at: {token.ValidTo} (UTC)");
 
             return new JwtSecurityTokenHandler().WriteToken(token);
         }

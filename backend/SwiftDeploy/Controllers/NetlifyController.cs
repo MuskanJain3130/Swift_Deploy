@@ -32,6 +32,36 @@ namespace SwiftDeploy.Controllers
             return Challenge(new AuthenticationProperties { RedirectUri = redirectUri }, "Netlify");
 
         }
+        [HttpGet("netlify/check-github-access")]
+        [Authorize]
+        public async Task<IActionResult> CheckGitHubAccess()
+        {
+            var netlifyToken = Request.Cookies["NetlifyAccessToken"];
+            if (string.IsNullOrEmpty(netlifyToken))
+                return Unauthorized(new { error = "Netlify token not found." });
+
+            using var client = new HttpClient();
+            client.DefaultRequestHeaders.Authorization = new AuthenticationHeaderValue("Bearer", netlifyToken);
+
+            // Get user info
+            var userResp = await client.GetAsync("https://api.netlify.com/api/v1/user");
+            var userData = await userResp.Content.ReadAsStringAsync();
+
+            // Get accounts
+            var accountsResp = await client.GetAsync("https://api.netlify.com/api/v1/accounts");
+            var accountsData = await accountsResp.Content.ReadAsStringAsync();
+
+            // Get GitHub installations
+            var installationsResp = await client.GetAsync("https://api.netlify.com/api/v1/deploy_keys");
+            var installationsData = await installationsResp.Content.ReadAsStringAsync();
+
+            return Ok(new
+            {
+                user = JsonSerializer.Deserialize<object>(userData),
+                accounts = JsonSerializer.Deserialize<object>(accountsData),
+                installations = JsonSerializer.Deserialize<object>(installationsData)
+            });
+        }
 
 
         [HttpGet("netlify/callback")]

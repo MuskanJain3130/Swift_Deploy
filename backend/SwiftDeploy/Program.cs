@@ -301,17 +301,17 @@ var builder = WebApplication.CreateBuilder(args);
 
 // Add services to the container.
 builder.Services.AddHttpClient();
+builder.Services.AddHttpContextAccessor(); //there was an error in netlify login so i added this line
 builder.Services.AddScoped<ITemplateEngine, TemplateEngine>();
 builder.Services.AddScoped<IGitHubService, GitHubService>();
 builder.Services.AddScoped<IUnifiedDeploymentService, UnifiedDeploymentService>();
 builder.Services.AddScoped<TokenService>();
-builder.Services.AddScoped<JwtHelper>(); // Add this line with your other services
-
+builder.Services.AddScoped<JwtHelper>();
 builder.Services.AddAuthentication(options =>
 {
-    options.DefaultAuthenticateScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultSignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-    options.DefaultChallengeScheme = "GitHub";
+    options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultChallengeScheme = JwtBearerDefaults.AuthenticationScheme;
+    options.DefaultScheme = JwtBearerDefaults.AuthenticationScheme;
 })
 .AddCookie(options =>
 {
@@ -320,7 +320,7 @@ builder.Services.AddAuthentication(options =>
     options.Cookie.IsEssential = true;
     options.Cookie.Path = "/";
 })
-.AddJwtBearer("JWT", options =>
+.AddJwtBearer(options =>
 {
     options.TokenValidationParameters = new TokenValidationParameters
     {
@@ -330,7 +330,21 @@ builder.Services.AddAuthentication(options =>
         ValidateIssuerSigningKey = true,
         ValidIssuer = builder.Configuration["Jwt:Issuer"],
         ValidAudience = builder.Configuration["Jwt:Audience"],
-        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"]))
+        IssuerSigningKey = new SymmetricSecurityKey(Encoding.UTF8.GetBytes(builder.Configuration["Jwt:Key"])),
+        ClockSkew = TimeSpan.Zero,
+        RequireExpirationTime = true
+    };
+
+    options.Events = new JwtBearerEvents
+    {
+        OnAuthenticationFailed = context =>
+        {
+            if (context.Exception.GetType() == typeof(SecurityTokenExpiredException))
+            {
+                context.Response.Headers.Add("Token-Expired", "true");
+            }
+            return Task.CompletedTask;
+        }
     };
 })
 .AddOAuth("GitHub", options =>
@@ -345,6 +359,7 @@ builder.Services.AddAuthentication(options =>
 
     options.Scope.Add("read:user");
     options.Scope.Add("repo");
+    options.Scope.Add("user:email");
 
     options.SaveTokens = true;
 
@@ -526,7 +541,7 @@ builder.Services.AddAuthentication(options =>
                 // Don't handle here, let it pass through to controller
                 context.SkipHandler();
                 return Task.CompletedTask;
-            }
+        }
 
             context.Response.Redirect("http://localhost:5173/vercel-callback?error=auth_failed");
             context.HandleResponse();
@@ -567,7 +582,7 @@ builder.Services.AddCookiePolicy(options =>
     options.OnDeleteCookie = cookieContext =>
     {
         cookieContext.CookieOptions.SameSite = SameSiteMode.None;
-        cookieContext.CookieOptions.Secure = true;
+        cookieContext.CookieOptions.Secure = true;  
         cookieContext.CookieOptions.IsEssential = true;
     };
 });

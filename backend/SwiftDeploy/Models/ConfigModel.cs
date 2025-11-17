@@ -26,21 +26,33 @@ namespace SwiftDeploy.Models
         public string GitHubToken { get; set; }
     }
 
+    // Models/ConfigModels.cs
     public class CommonConfig
     {
+        [Required]
         public string ProjectName { get; set; }
-        public string BuildCommand { get; set; } = "npm run build";
-        public string OutputDirectory { get; set; } = "dist";
-        public string InstallCommand { get; set; } = "npm install";
-        public string NodeVersion { get; set; } = "18.x";
+        public string? BuildCommand { get; set; }
+        public string OutputDirectory { get; set; } = ".";
+        public string? InstallCommand { get; set; }
+        public string? NodeVersion { get; set; }
+        public string? Domain { get; set; }
         public Dictionary<string, string> EnvironmentVariables { get; set; } = new();
         public List<RedirectRule> Redirects { get; set; } = new();
         public List<HeaderRule> Headers { get; set; } = new();
-        public string Domain { get; set; }
-        public bool EnableHttps { get; set; } = true;
-        public string Framework { get; set; }
-    }
 
+        public bool EnableHttps { get; set; } = true;
+
+        // Update Framework to support static
+        public string Framework { get; set; } = "static"; // Default to static
+
+        // Add project type
+        public ProjectType ProjectType { get; set; } = ProjectType.Static;
+    }
+    public enum ProjectType
+    {
+        Static,      // Plain HTML/CSS/JS
+        Framework    // React, Vue, Next.js, etc.
+    }
     public class RedirectRule
     {
         public string From { get; set; }
