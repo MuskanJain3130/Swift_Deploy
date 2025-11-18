@@ -56,37 +56,65 @@ function Projects() {
   /* Fetch repos when modal opens */
   useEffect(() => {
     const fetchRepositories = async () => {
-      const token = localStorage.getItem("github_access_token");
-      if (!token) {
-        navigate("/");
+      console.log('Fetching repositories...');
+      const jwtToken = localStorage.getItem("jwtToken");
+      console.log('Current JWT token from localStorage:', jwtToken ? 'Token exists' : 'No token found');
+      
+      if (!jwtToken) {
+        const errorMsg = 'No authentication token found. Please log in again.';
+        console.error(errorMsg);
+        setError("Session expired. Please log in again.");
+        setLoading(false);
+        // Close the modal and navigate after a short delay to show the error
+        setTimeout(() => {
+          console.log('Closing modal and navigating to login...');
+          setModalOpen(false);
+          navigate("/");
+        }, 1500);
         return;
       }
 
       try {
-        const response = await fetch("http://localhost:5280/api/repositories", {
+        console.log('Making API request to fetch repositories...');
+        const apiUrl = "http://localhost:5280/api/repositories";
+        console.log('API URL:', apiUrl);
+        
+        const response = await fetch(apiUrl, {
           method: "GET",
           headers: {
             "Content-Type": "application/json",
-            Authorization: `Bearer ${token}`,
+            Authorization: `Bearer ${jwtToken}`,
           },
         });
+        
+        console.log('API Response status:', response.status);
 
         if (!response.ok) {
           const errorText = await response.text();
           if (response.status === 401) {
-            throw new Error("Unauthorized: Session expired. Please log in again.");
+            throw new Error("Session expired. Please log in again.");
           }
           throw new Error(`Failed to fetch repositories: ${response.status} ${errorText}`);
         }
 
         const data = await response.json();
+        console.log('Repositories received:', data);
         setRepos(data);
       } catch (err) {
         console.error("Failed to fetch repositories:", err);
         setError(err.message);
-        if (err.message.includes("Unauthorized")) {
+        
+        if (err.message.includes("Session expired") || err.message.includes("Unauthorized")) {
+          // Clear the token and show error before navigating
           localStorage.removeItem("github_access_token");
-          navigate("/");
+          
+          // Close the modal and show error before navigating
+          setModalOpen(false);
+          
+          // Show error briefly before navigating
+          setTimeout(() => {
+            navigate("/", { state: { authError: err.message } });
+          }, 1500);
         }
       } finally {
         setLoading(false);
