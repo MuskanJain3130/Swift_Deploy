@@ -1,3 +1,6 @@
+
+=========
+>>>>>>>>> Temporary merge branch 2
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -21,11 +24,11 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor(); //there was an error in netlify login so i added this line
 builder.Services.AddScoped<ITemplateEngine, TemplateEngine>();
-builder.Services.AddScoped<IGitHubService, GitHubService>();
-builder.Services.AddScoped<IUnifiedDeploymentService, UnifiedDeploymentService>();
-builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<JwtHelper>();
 
+builder.Services.AddAuthentication(options =>
+{
+builder.Services.AddScoped<JwtHelper>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -343,7 +346,7 @@ foreach (var endpoint in endpointDataSource.Endpoints)
     {
         logger.LogInformation(" {Endpoint}", endpoint.DisplayName ?? endpoint.ToString());
     }
-}
+app.Run();
 app.MapControllers();
-
+>>>>>>>>> Temporary merge branch 2
 app.Run();

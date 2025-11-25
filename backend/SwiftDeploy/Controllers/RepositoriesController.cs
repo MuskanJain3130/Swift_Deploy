@@ -8,8 +8,11 @@ using SwiftDeploy.Services;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
+<<<<<<<<< Temporary merge branch 1
 using SwiftDeploy.Models;
 using Microsoft.AspNetCore.Authorization;
+=========
+>>>>>>>>> Temporary merge branch 2
 
 namespace SwiftDeploy.Controllers
 {

@@ -31,7 +31,6 @@ namespace SwiftDeploy.Services
                 _ => throw new ArgumentException($"Unsupported platform: {platform}")
             };
         }
-
         public string GetContentType(string platform)
         {
             return platform.ToLower() switch
