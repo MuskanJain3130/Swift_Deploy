@@ -64,7 +64,7 @@ namespace SwiftDeploy.Controllers
         }
 
 
-        [HttpGet("netlify/callback")]
+        [HttpGet("/auth/netlify/callback")]
         public async Task<IActionResult> Callback(string code)
         {
             var clientId = _config["Netlify:ClientId"];

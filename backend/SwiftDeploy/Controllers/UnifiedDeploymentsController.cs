@@ -222,6 +222,16 @@ namespace SwiftDeploy.Controllers
 
             try
             {
+                // Get user ID from auth
+                var authToken = HttpContext.Request.Headers["Authorization"].FirstOrDefault();
+
+               
+                // Get platform token (header or database)
+                var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
+
+                if (string.IsNullOrEmpty(platformToken))
+                    return BadRequest($"No {request.Platform} token found. Please connect your {request.Platform} account.");
+
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
@@ -230,7 +240,7 @@ namespace SwiftDeploy.Controllers
                     return BadRequest($"Unsupported platform: {request.Platform}");
 
                 // Get platform token
-                var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
+                //var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
                 if (string.IsNullOrEmpty(platformToken))
                     return BadRequest($"No {request.Platform} token found. Please connect your {request.Platform} account.");
 
@@ -254,6 +264,10 @@ namespace SwiftDeploy.Controllers
                 // Step 1: Generate and save config using the shared service method
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating and saving configuration...");
 
+                var configContent = await _templateEngine.GenerateConfigAsync(request.Platform, request.Config);
+                var fileName = _templateEngine.GetConfigFileName(request.Platform);
+
+                // Push config to user's GitHub repo
                 var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
                 var configResult = await gitHubService.GenerateAndSaveConfigAsync(
                     request.Platform,
@@ -475,6 +489,7 @@ namespace SwiftDeploy.Controllers
                 };
             }
         }
+
         // Helper function for Netlify deployment
         private async Task<DeploymentResponse> DeployToNetlifyWithConfig(string repoPath, string branch, CommonConfig config)
         {

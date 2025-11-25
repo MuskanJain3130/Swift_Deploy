@@ -1,4 +1,4 @@
-using Microsoft.AspNetCore.Authorization;
+﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Http.HttpResults;
 using Microsoft.AspNetCore.Mvc;
@@ -172,6 +172,7 @@ namespace SwiftDeploy.Controllers
 
             if (string.IsNullOrWhiteSpace(accessToken))
                 return BadRequest("Missing Authorization header");
+
             // Optional: strip "Bearer " prefix if present
             if (accessToken.StartsWith("Bearer "))
                 accessToken = accessToken.Substring("Bearer ".Length);

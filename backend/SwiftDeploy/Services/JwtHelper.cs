@@ -1,4 +1,4 @@
-// Services/JwtHelper.cs
+﻿// Services/JwtHelper.cs
 using Microsoft.IdentityModel.Tokens;
 using SwiftDeploy.Models;
 using System.IdentityModel.Tokens.Jwt;
