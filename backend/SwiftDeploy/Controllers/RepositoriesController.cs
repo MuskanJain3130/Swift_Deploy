@@ -27,29 +27,60 @@ namespace SwiftDeploy.Controllers
         }
 
         /// <summary>
+        /// Authenticate user and (optionally) return stored GitHub token.
         /// </summary>
+        //private bool TryAuthenticate(out string errorMessage, out string githubToken)
+        //{
+        //    errorMessage = string.Empty;
+        //    githubToken = null;
+
+        //    // Extract user ID from JWT claims
+        //    var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+        //    if (string.IsNullOrEmpty(userId))
+        //    {
+        //        errorMessage = "User ID not found in token.";
+        //        return false;
+        //    }
+
+        //    // Look up the GitHub token from MongoDB using UserId field
+        //    var userToken = _mongo.UserTokens.Find(x => x.UserId == userId).FirstOrDefault();
+        //    if (userToken == null || string.IsNullOrEmpty(userToken.GitHubToken))
+        //    {
+        //        errorMessage = "GitHub token not found in database. Please re-authenticate with GitHub.";
+        //        return false;
+        //    }
+
+        //    // Set the GitHub token for Octokit and return it
+        //    githubToken = userToken.GitHubToken;
+        //    _githubClient.Credentials = new Credentials(githubToken);
+        //    return true;
+        //}
+
         private bool TryAuthenticate(out string errorMessage)
         {
             errorMessage = string.Empty;
 
+            // Extract user ID from JWT claims
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+            if (string.IsNullOrEmpty(userId))
             {
+                errorMessage = "User ID not found in token.";
+                return false;
+            }
+            // Look up the GitHub token from MongoDB using UserId field
+            var userToken = _mongo.UserTokens.Find(x => x.UserId == userId).FirstOrDefault();
+            if (userToken == null || string.IsNullOrEmpty(userToken.GitHubToken))
+            {
+                errorMessage = "GitHub token not found in database. Please re-authenticate with GitHub.";
                 return false;
             }
 
-            {
-                return false;
-            }
-
+            // Set the GitHub token for Octokit
+            _githubClient.Credentials = new Credentials(userToken.GitHubToken);
             return true;
         }
-            catch (Exception ex)
-            {
-                errorMessage = $"Failed to set GitHub credentials: {ex.Message}";
-                Console.WriteLine($"ERROR: Exception setting credentials - {ex.Message}");
-                return false;
-            }
-        }
 
+        [HttpGet]
         public async Task<IActionResult> GetRepositories()
         {
             if (!TryAuthenticate(out var error)) return Unauthorized(error);
@@ -181,10 +212,9 @@ namespace SwiftDeploy.Controllers
                 return StatusCode(500, $"Internal server error: {ex.Message}");
             }
         }
-    
-        
+
         [HttpPost("save")]
-        public IActionResult SaveRepository([FromBody] Dictionary<string, object> body)
+        public IActionResult SaveRepository([FromBody] System.Collections.Generic.Dictionary<string, object> body)
         {
             if (body == null)
                 return BadRequest("Repository data is required");
@@ -195,7 +225,7 @@ namespace SwiftDeploy.Controllers
                 RepoUrl = body.ContainsKey("repoUrl") ? body["repoUrl"].ToString() : null,
                 Branch = body.ContainsKey("branch") ? body["branch"].ToString() : "main",
                 UserId = body.ContainsKey("userId") ? body["userId"].ToString() : null,
-                CreatedAt = DateTime.UtcNow
+                CreatedAt = System.DateTime.UtcNow
             };
 
             _mongo.Repositories.InsertOne(repo);
@@ -208,6 +238,8 @@ namespace SwiftDeploy.Controllers
             var repos = _mongo.Repositories.Find(_ => true).ToList();
             return Ok(repos);
         }
+
+        [HttpGet("deployments/{repoId}")]
         public IActionResult GetDeploymentsByRepo(string repoId)
         {
             var repositories = _mongo.Repositories.Find(r => r.Id == repoId).ToList();
@@ -222,33 +254,8 @@ namespace SwiftDeploy.Controllers
         {
             Console.WriteLine("=== Analyze and Suggest Endpoint Called ===");
 
-            // Try to get token from multiple sources
-            var githubToken = HttpContext.Request.Headers["GitHub-API-Key"].FirstOrDefault()
-                           ?? HttpContext.Request.Headers["Authorization"].FirstOrDefault()?.Replace("Bearer ", "")
-                           ?? HttpContext.Request.Cookies["GitHubAccessToken"];
-
-            Console.WriteLine($"GitHub-API-Key Header: {HttpContext.Request.Headers["GitHub-API-Key"].FirstOrDefault() ?? "NULL"}");
-            Console.WriteLine($"Authorization Header: {HttpContext.Request.Headers["Authorization"].FirstOrDefault() ?? "NULL"}");
-            Console.WriteLine($"Cookie Token: {HttpContext.Request.Cookies["GitHubAccessToken"] ?? "NULL"}");
-            Console.WriteLine($"Final Token Found: {!string.IsNullOrEmpty(githubToken)}");
-
-            // Validate GitHub token
-            if (string.IsNullOrEmpty(githubToken))
-            {
-                return BadRequest(new
-                {
-                    success = false,
-                    error = "Missing GitHub token. Please provide via GitHub-API-Key header, Authorization header, or GitHubAccessToken cookie.",
-                    debug = new
-                    {
-                        hasGitHubApiKeyHeader = HttpContext.Request.Headers.ContainsKey("GitHub-API-Key"),
-                        hasAuthorizationHeader = HttpContext.Request.Headers.ContainsKey("Authorization"),
-                        hasGitHubCookie = HttpContext.Request.Cookies.ContainsKey("GitHubAccessToken")
-                    }
-                });
-            }
-
-            githubToken = githubToken.Trim();
+            // Authenticate current user and obtain the stored GitHub token
+            if (!TryAuthenticate(out var error)) return Unauthorized(error);
 
             // Validate request body
             if (request == null || string.IsNullOrEmpty(request.Owner) || string.IsNullOrEmpty(request.RepoName))
@@ -262,15 +269,15 @@ namespace SwiftDeploy.Controllers
 
             try
             {
-                // Set GitHub credentials
-                _githubClient.Credentials = new Credentials(githubToken);
+                // GitHub token is already set on _githubClient by TryAuthenticate,
+                // but ensure credentials are set explicitly using the token returned
 
                 Console.WriteLine($"=== Analyzing Repository ===");
                 Console.WriteLine($"Owner: {request.Owner}");
                 Console.WriteLine($"Repo: {request.RepoName}");
                 Console.WriteLine($"Branch: {request.Branch ?? "main"}");
-                Console.WriteLine($"Token Length: {githubToken.Length}");
-                Console.WriteLine($"Token Prefix: {githubToken.Substring(0, Math.Min(7, githubToken.Length))}...");
+                //Console.WriteLine($"Token Length: {githubToken?.Length ?? 0}");
+                //Console.WriteLine($"Token Prefix: {(githubToken != null ? githubToken.Substring(0, System.Math.Min(7, githubToken.Length)) + "..." : "NULL")}");
 
                 // Test GitHub authentication first
                 try
@@ -278,7 +285,7 @@ namespace SwiftDeploy.Controllers
                     var user = await _githubClient.User.Current();
                     Console.WriteLine($"Authenticated as: {user.Login}");
                 }
-                catch (Exception authEx)
+                catch (System.Exception authEx)
                 {
                     Console.WriteLine($"Authentication test failed: {authEx.Message}");
                     return Unauthorized(new
@@ -364,7 +371,7 @@ namespace SwiftDeploy.Controllers
                     details = ex.Message
                 });
             }
-            catch (Exception ex)
+            catch (System.Exception ex)
             {
                 Console.WriteLine($"Error analyzing repository: {ex.Message}");
                 Console.WriteLine($"Stack trace: {ex.StackTrace}");

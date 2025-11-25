@@ -240,7 +240,7 @@ namespace SwiftDeploy.Controllers
                     return BadRequest($"Unsupported platform: {request.Platform}");
 
                 // Get platform token
-                var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
+                //var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
                 if (string.IsNullOrEmpty(platformToken))
                     return BadRequest($"No {request.Platform} token found. Please connect your {request.Platform} account.");
 
