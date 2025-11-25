@@ -40,7 +40,6 @@ namespace SwiftDeploy.Controllers
                 errorMessage = "User ID not found in token.";
                 return false;
             }
-
             // Look up the GitHub token from MongoDB using UserId field
             var userToken = _mongo.UserTokens.Find(x => x.UserId == userId).FirstOrDefault();
             if (userToken == null || string.IsNullOrEmpty(userToken.GitHubToken))
