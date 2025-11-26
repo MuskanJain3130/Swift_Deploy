@@ -1,6 +1,10 @@
 ﻿// Services/UnifiedDeploymentService.cs
+using Microsoft.AspNetCore.Http;
+using MongoDB.Driver;
 using Octokit;
 using SwiftDeploy.Models;
+using SwiftDeploy.Models.SwiftDeploy.Models;
+using SwiftDeploy.Services;
 using SwiftDeploy.Services.Interfaces;
 using System.IO.Compression;
 using System.Text.Json;
@@ -14,23 +18,153 @@ namespace SwiftDeploy.Services.Interfaces
         private readonly ITemplateEngine _templateEngine;
         private readonly ILogger<UnifiedDeploymentService> _logger;
         private readonly GitHubClient _gitHubClient;
+        private readonly MongoDbService _mongoDbService;
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private static readonly Dictionary<string, ProjectInfo> _projectStatuses = new();
 
         public UnifiedDeploymentService(
             IConfiguration configuration,
             ITemplateEngine templateEngine,
-            ILogger<UnifiedDeploymentService> logger)
+            ILogger<UnifiedDeploymentService> logger,
+            MongoDbService mongoDbService,
+            IHttpContextAccessor httpContextAccessor)
         {
             _configuration = configuration;
             _templateEngine = templateEngine;
             _logger = logger;
+            _mongoDbService = mongoDbService;
+            _httpContextAccessor = httpContextAccessor;
 
             // Initialize GitHub client with SwiftDeploy token
             var swiftDeployToken = _configuration["SwiftDeploy:GitHubToken"];
-            _gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
+
+            if (!string.IsNullOrEmpty(swiftDeployToken))
             {
-                Credentials = new Credentials(swiftDeployToken)
-            };
+                _gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
+                {
+                    Credentials = new Credentials(swiftDeployToken)
+                };
+                _logger.LogInformation("GitHub client initialized with SwiftDeploy token");
+            }
+            else
+            {
+                // Initialize without credentials - will use user tokens per request
+                _gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"));
+                _logger.LogWarning("GitHub client initialized without credentials. Will use user tokens for operations.");
+            }
+        }
+
+        // ⭐ Helper: Get user's GitHub token from header OR database
+        private async Task<string?> GetUserGitHubTokenAsync(string userId)
+        {
+            try
+            {
+                // First, try to get from header/cookie
+                var httpContext = _httpContextAccessor?.HttpContext;
+                if (httpContext != null)
+                {
+                    // Check for GitHub token in cookies
+                    if (httpContext.Request.Cookies.TryGetValue("GitHubAccessToken", out var cookieToken))
+                    {
+                        _logger.LogInformation("Retrieved GitHub token from cookie for user {UserId}", userId);
+                        return cookieToken;
+                    }
+
+                    // Check for GitHub token in custom header
+                    if (httpContext.Request.Headers.TryGetValue("X-GitHub-Token", out var headerToken))
+                    {
+                        _logger.LogInformation("Retrieved GitHub token from header for user {UserId}", userId);
+                        return headerToken.ToString();
+                    }
+                }
+
+                // ⭐ If not in header/cookie, get from database
+                var filter = Builders<UserTokens>.Filter.And(
+                    Builders<UserTokens>.Filter.Eq(t => t.UserId, userId)
+                    //Builders<UserTokens>.Filter.Eq(t => t.GitHubToken, "githubToken")
+                );
+
+                var userToken = await _mongoDbService.UserTokens.Find(filter).FirstOrDefaultAsync();
+
+                if (userToken != null && !string.IsNullOrEmpty(userToken.GitHubToken))
+                {
+                    _logger.LogInformation("Retrieved GitHub token from database for user {UserId}", userId);
+                    return userToken.GitHubToken;
+                }
+
+                _logger.LogWarning("No GitHub token found for user {UserId}", userId);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving GitHub token for user {UserId}", userId);
+                return null;
+            }
+        }
+
+        // ⭐ Helper: Get platform token (Cloudflare/Netlify/Vercel) from header OR database
+        private async Task<string?> GetPlatformTokenAsync(string userId, string platform)
+        {
+            try
+            {
+                // First, try to get from header/cookie
+                var httpContext = _httpContextAccessor?.HttpContext;
+                if (httpContext != null)
+                {
+                    // Check for platform token in cookies
+                    var cookieKey = $"{platform}AccessToken";
+                    if (httpContext.Request.Cookies.TryGetValue(cookieKey, out var cookieToken))
+                    {
+                        _logger.LogInformation("Retrieved {Platform} token from cookie for user {UserId}", platform, userId);
+                        return cookieToken;
+                    }
+
+                    // Check for platform token in custom header
+                    var headerKey = $"X-{platform}-Token";
+                    if (httpContext.Request.Headers.TryGetValue(headerKey, out var headerToken))
+                    {
+                        _logger.LogInformation("Retrieved {Platform} token from header for user {UserId}", platform, userId);
+                        return headerToken.ToString();
+                    }
+                }
+
+                // ⭐ If not in header/cookie, get from database
+                var filter = Builders<UserTokens>.Filter.And(
+                    Builders<UserTokens>.Filter.Eq(t => t.UserId, userId),
+                    Builders<UserTokens>.Filter.Eq(t => t.GitHubToken, platform.ToLower())
+                );
+
+                var userToken = await _mongoDbService.UserTokens.Find(filter).FirstOrDefaultAsync();
+
+                if (userToken != null && !string.IsNullOrEmpty(userToken.GitHubToken))
+                {
+                    _logger.LogInformation("Retrieved {Platform} token from database for user {UserId}", platform, userId);
+                    return userToken.GitHubToken;
+                }
+
+                _logger.LogWarning("No {Platform} token found for user {UserId}", platform, userId);
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error retrieving {Platform} token for user {UserId}", platform, userId);
+                return null;
+            }
+        }
+
+        // Helper: create GitHubClient for a user (falls back to the service-level client if no token)
+        private GitHubClient CreateGitHubClientForUser(string? userToken)
+        {
+            if (!string.IsNullOrEmpty(userToken))
+            {
+                return new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
+                {
+                    Credentials = new Credentials(userToken)
+                };
+            }
+
+            // fallback to service-level client (may be unauthenticated or use SwiftDeploy token)
+            return _gitHubClient;
         }
 
         public async Task<string> UploadAndExtractProjectAsync(IFormFile zipFile, string projectName)
@@ -165,13 +299,20 @@ namespace SwiftDeploy.Services.Interfaces
                 return false;
             }
         }
-        public async Task<DeploymentResponse> DeployToCloudflareAsync(string repoName, string branch, CommonConfig config, string userId, string platformToken)
+
+        // ⭐ Updated: Now retrieves token from database if not provided
+        public async Task<DeploymentResponse> DeployToCloudflareAsync(string repoName, string branch, CommonConfig config, string userId, string platformToken = null)
         {
             try
             {
-                // Use platformToken instead of configuration token
+                // ⭐ Get token from database if not provided
                 if (string.IsNullOrEmpty(platformToken))
-                    throw new Exception("Cloudflare token not provided");
+                {
+                    platformToken = await GetPlatformTokenAsync(userId, "cloudflare");
+                }
+
+                if (string.IsNullOrEmpty(platformToken))
+                    throw new Exception("Cloudflare token not found. Please connect your Cloudflare account.");
 
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", platformToken);
@@ -244,13 +385,20 @@ namespace SwiftDeploy.Services.Interfaces
                 };
             }
         }
-        public async Task<DeploymentResponse> DeployToNetlifyAsync(string repoName, string branch, CommonConfig config, string userId, string platformToken)
+
+        // ⭐ Updated: Now retrieves token from database if not provided
+        public async Task<DeploymentResponse> DeployToNetlifyAsync(string repoName, string branch, CommonConfig config, string userId, string platformToken = null)
         {
             try
             {
-                // Use platformToken instead of configuration token
+                // ⭐ Get token from database if not provided
                 if (string.IsNullOrEmpty(platformToken))
-                    throw new Exception("Netlify token not provided");
+                {
+                    platformToken = await GetPlatformTokenAsync(userId, "netlify");
+                }
+
+                if (string.IsNullOrEmpty(platformToken))
+                    throw new Exception("Netlify token not found. Please connect your Netlify account.");
 
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", platformToken);
@@ -304,13 +452,20 @@ namespace SwiftDeploy.Services.Interfaces
                 };
             }
         }
-        public async Task<DeploymentResponse> DeployToVercelAsync(string repoName, string branch, CommonConfig config, string userId, string platformToken)
+
+        // ⭐ Updated: Now retrieves token from database if not provided
+        public async Task<DeploymentResponse> DeployToVercelAsync(string repoName, string branch, CommonConfig config, string userId, string platformToken = null)
         {
             try
             {
-                // Use platformToken instead of configuration token
+                // ⭐ Get token from database if not provided
                 if (string.IsNullOrEmpty(platformToken))
-                    throw new Exception("Vercel token not provided");
+                {
+                    platformToken = await GetPlatformTokenAsync(userId, "vercel");
+                }
+
+                if (string.IsNullOrEmpty(platformToken))
+                    throw new Exception("Vercel token not found. Please connect your Vercel account.");
 
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", platformToken);
@@ -358,6 +513,7 @@ namespace SwiftDeploy.Services.Interfaces
                 };
             }
         }
+
         public async Task<ProjectInfo> GetProjectInfoAsync(string projectId)
         {
             try
@@ -377,6 +533,7 @@ namespace SwiftDeploy.Services.Interfaces
                 throw;
             }
         }
+
         public async Task UpdateProjectStatusAsync(string projectId, Models.DeploymentStatus status, string message = null)
         {
             try
@@ -394,7 +551,6 @@ namespace SwiftDeploy.Services.Interfaces
                     _logger.LogWarning($"Attempted to update status for non-existent project {projectId}");
                 }
 
-                // This is async to allow for future enhancements like database updates or notifications
                 await Task.CompletedTask;
             }
             catch (Exception ex)
@@ -402,19 +558,18 @@ namespace SwiftDeploy.Services.Interfaces
                 _logger.LogError(ex, $"Error updating project status for {projectId}");
                 throw;
             }
-        }// Helper method to generate repository name
+        }
+
+        // Helper method to generate repository name
         private string GenerateRepoName(string projectName)
         {
-            // Sanitize project name for GitHub repo naming rules
             var sanitized = projectName.ToLower()
                 .Replace(" ", "-")
                 .Replace("_", "-")
                 .Replace(".", "-");
 
-            // Remove invalid characters
             sanitized = System.Text.RegularExpressions.Regex.Replace(sanitized, @"[^a-z0-9\-]", "");
 
-            // Add timestamp to ensure uniqueness
             var timestamp = DateTimeOffset.UtcNow.ToUnixTimeSeconds();
 
             return $"{sanitized}-{timestamp}";
@@ -429,6 +584,12 @@ namespace SwiftDeploy.Services.Interfaces
             var hash = sha1.ComputeHash(System.Text.Encoding.UTF8.GetBytes(raw));
             var hex = BitConverter.ToString(hash).Replace("-", "").ToLower();
             return $"swiftdeploy-{hex.Substring(0, 10)}";
+        }
+
+        // ⭐ Public method to get GitHub token (for use in controllers)
+        public async Task<string?> GetGitHubTokenForUserAsync(string userId)
+        {
+            return await GetUserGitHubTokenAsync(userId);
         }
     }
 }
