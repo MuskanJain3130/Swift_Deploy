@@ -239,11 +239,7 @@ namespace SwiftDeploy.Controllers
                 if (!supportedPlatforms.Contains(request.Platform.ToLower()))
                     return BadRequest($"Unsupported platform: {request.Platform}");
 
-                // Get platform token
-                var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
-                if (string.IsNullOrEmpty(platformToken))
-                    return BadRequest($"No {request.Platform} token found. Please connect your {request.Platform} account.");
-
+               
                 // Initialize project tracking
                 var projectInfo = new ProjectInfo
                 {
