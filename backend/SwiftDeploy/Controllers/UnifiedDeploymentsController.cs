@@ -222,16 +222,6 @@ namespace SwiftDeploy.Controllers
 
             try
             {
-                // Get user ID from auth
-                var authToken = HttpContext.Request.Headers["Authorization"].FirstOrDefault();
-
-               
-                // Get platform token (header or database)
-                var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
-
-                if (string.IsNullOrEmpty(platformToken))
-                    return BadRequest($"No {request.Platform} token found. Please connect your {request.Platform} account.");
-
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
@@ -239,10 +229,31 @@ namespace SwiftDeploy.Controllers
                 if (!supportedPlatforms.Contains(request.Platform.ToLower()))
                     return BadRequest($"Unsupported platform: {request.Platform}");
 
-                // Get platform token
-                //var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
+                // ⭐ Get GitHub token from service (checks header then database)
+                var githubToken = await ((UnifiedDeploymentService)_deploymentService).GetGitHubTokenForUserAsync(request.UserId);
+                if (string.IsNullOrEmpty(githubToken))
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = "GitHub token not found. Please connect your GitHub account first.",
+                        platform = "github",
+                        userId = request.UserId
+                    });
+                }
+
+                // ⭐ ADD THIS: Get platform token (Cloudflare/Netlify/Vercel)
+                var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
                 if (string.IsNullOrEmpty(platformToken))
-                    return BadRequest($"No {request.Platform} token found. Please connect your {request.Platform} account.");
+                {
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = $"No {request.Platform} token found. Please connect your {request.Platform} account.",
+                        platform = request.Platform,
+                        userId = request.UserId
+                    });
+                }
 
                 // Initialize project tracking
                 var projectInfo = new ProjectInfo
@@ -261,18 +272,18 @@ namespace SwiftDeploy.Controllers
 
                 _logger.LogInformation($"Starting GitHub deployment for {request.GitHubRepo} on {request.Platform}");
 
-                // Step 1: Generate and save config using the shared service method
+                // Step 1: Generate and save config
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating and saving configuration...");
 
                 var configContent = await _templateEngine.GenerateConfigAsync(request.Platform, request.Config);
                 var fileName = _templateEngine.GetConfigFileName(request.Platform);
 
-                // Push config to user's GitHub repo
+                // Push config to user's GitHub repo - ⭐ Use githubToken variable
                 var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
                 var configResult = await gitHubService.GenerateAndSaveConfigAsync(
                     request.Platform,
                     request.GitHubRepo,
-                    request.GitHubToken,
+                    githubToken,  // ⭐ Changed from request.GitHubToken
                     request.Branch ?? "main",
                     request.Config
                 );
@@ -292,14 +303,14 @@ namespace SwiftDeploy.Controllers
                     });
                 }
 
-                // Step 2: Deploy to platform
+                // Step 2: Deploy to platform - ⭐ Now platformToken is defined
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Deploying, $"Deploying to {request.Platform}...");
 
                 DeploymentResponse deploymentResult = request.Platform.ToLower() switch
                 {
-                    "cloudflare" => await DeployToCloudflareWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, request.GitHubToken),
-                    "netlify" => await DeployToNetlifyWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, request.GitHubToken),
-                    "vercel" => await DeployToVercelWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, request.GitHubToken),
+                    "cloudflare" => await DeployToCloudflareWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, githubToken),
+                    "netlify" => await DeployToNetlifyWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, githubToken),
+                    "vercel" => await DeployToVercelWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, githubToken),
                     _ => throw new ArgumentException($"Unsupported platform: {request.Platform}")
                 };
 
@@ -340,8 +351,8 @@ namespace SwiftDeploy.Controllers
                 });
             }
         }
-        
-        
+
+
         [HttpGet("projects")]
         public async Task<IActionResult> GetUserProjects([FromQuery] string userId = null)
         {
@@ -829,7 +840,7 @@ namespace SwiftDeploy.Controllers
                     throw new Exception($"Cloudflare project creation failed: {createResult}");
 
                 var createData = JsonDocument.Parse(createResult);
-                var deploymentUrl = createData.RootElement.GetProperty("result").GetProperty("subdomain").GetString() + ".pages.dev";
+                var deploymentUrl = createData.RootElement.GetProperty("result").GetProperty("subdomain").GetString() ;
 
                 // Trigger deployment
                 var deployUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects/{projectName}/deployments";

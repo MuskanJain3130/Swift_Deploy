@@ -68,8 +68,6 @@ namespace SwiftDeploy.Models
         [RegularExpression(@"^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$",
             ErrorMessage = "GitHub repository must be in format 'owner/repo'")]
         public string GitHubRepo { get; set; }
-        [Required]
-        public string GitHubToken { get; set; }
         public string Branch { get; set; } = "main";
         [Required]
         public CommonConfig Config { get; set; }

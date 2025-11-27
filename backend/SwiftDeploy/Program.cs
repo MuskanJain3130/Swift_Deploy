@@ -22,6 +22,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor(); //there was an error in netlify login so i added this line
 builder.Services.AddScoped<ITemplateEngine, TemplateEngine>();
 builder.Services.AddScoped<JwtHelper>();
+builder.Services.AddScoped<TokenService>();
 // Authentication registration (fixed: single AddAuthentication with chained handlers)
 builder.Services.AddAuthentication(options =>
 {
@@ -176,8 +177,11 @@ builder.Services.AddAuthentication(options =>
 
     builder.Services.Configure<MongoDbSettings>(
         builder.Configuration.GetSection("MongoDbSettings"));
+builder.Services.AddScoped<IUnifiedDeploymentService, UnifiedDeploymentService>();
+builder.Services.AddScoped<SwiftDeploy.Services.Interfaces.IGitHubService, SwiftDeploy.Services.GitHubService>();
 
-    builder.Services.AddSingleton<MongoDbService>();
+
+builder.Services.AddSingleton<MongoDbService>();
     builder.Services.AddSingleton<IMongoClient>(sp =>
     {
         var settings = builder.Configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>();
