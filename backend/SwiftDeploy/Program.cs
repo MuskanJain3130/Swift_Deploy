@@ -178,8 +178,11 @@ builder.Services.AddAuthentication(options =>
 
     builder.Services.Configure<MongoDbSettings>(
         builder.Configuration.GetSection("MongoDbSettings"));
+builder.Services.AddScoped<IUnifiedDeploymentService, UnifiedDeploymentService>();
+builder.Services.AddScoped<SwiftDeploy.Services.Interfaces.IGitHubService, SwiftDeploy.Services.GitHubService>();
 
-    builder.Services.AddSingleton<MongoDbService>();
+
+builder.Services.AddSingleton<MongoDbService>();
     builder.Services.AddSingleton<IMongoClient>(sp =>
     {
         var settings = builder.Configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>();

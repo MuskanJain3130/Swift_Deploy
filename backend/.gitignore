@@ -5,3 +5,4 @@
 SwiftDeploy/appsettings.Development.json
 SwiftDeploy/appsettings.Production.json
 SwiftDeploy/appsettings.*.json
+SwiftDeploy/appsettings.json
