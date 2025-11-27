@@ -318,16 +318,24 @@ namespace SwiftDeploy.Controllers
                             owner = analysis.Owner,
                             name = analysis.RepoName
                         },
+                        projectInfo = new
+                        {
+                            type = analysis.ProjectType ?? "Unknown",
+                            language = analysis.Language ?? "Unknown",
+                            frontendFramework = analysis.Framework ?? "None",
+                            backendFramework = analysis.BackendFramework ?? "None"
+                        },
                         detectedTechnologies = new
                         {
-                            framework = analysis.Framework ?? "Unknown",
                             buildTool = analysis.BuildTool ?? "None",
                             packageManager = analysis.PackageManager ?? "None",
                             technologies = analysis.DetectedTechnologies,
                             isStatic = analysis.IsStatic,
                             hasSSR = analysis.HasServerSideRendering,
                             hasEdgeFunctions = analysis.HasEdgeFunctions,
-                            hasApiRoutes = analysis.HasApiRoutes
+                            hasApiRoutes = analysis.HasApiRoutes,
+                            hasDatabase = analysis.HasDatabase,
+                            hasDocker = analysis.HasDocker
                         },
                         recommendedPlatform = analysis.RecommendedPlatform,
                         allSuggestions = analysis.Suggestions.Select(s => new
@@ -341,6 +349,7 @@ namespace SwiftDeploy.Controllers
                     }
                 });
             }
+
             catch (AuthorizationException ex)
             {
                 Console.WriteLine($"GitHub authorization failed: {ex.Message}");

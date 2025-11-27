@@ -45,10 +45,19 @@ namespace SwiftDeploy.Controllers
             return Ok(list);
         }
 
-        [HttpGet("{name}")]
-        public IActionResult GetProjectByName(string name)
+        //[HttpGet("{name}")]
+        //public IActionResult GetProjectByName(string name)
+        //{
+        //    var project = _Projects.Find(d => d.ProjectName == name).FirstOrDefault();
+        //    if (project == null)
+        //        return NotFound();
+
+        //    return Ok(project);
+        //}
+        [HttpGet("user/{id}")]
+        public IActionResult GetProjectByUserId(string id)
         {
-            var project = _Projects.Find(d => d.ProjectName == name).FirstOrDefault();
+            var project = _Projects.Find(d => d.UserId == id).ToList();
             if (project == null)
                 return NotFound();
 
