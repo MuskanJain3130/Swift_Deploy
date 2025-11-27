@@ -285,7 +285,7 @@ namespace SwiftDeploy.Controllers
         }
 
 
-        [HttpGet("{userId}/tokens")]
+        [HttpGet("{userId}/all-tokens")]
         public IActionResult GetUserTokens(string userId)
         {
             var tokens = _mongo.UserTokens.Find(x => x.UserId == userId).FirstOrDefault();

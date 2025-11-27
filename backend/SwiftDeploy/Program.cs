@@ -21,8 +21,9 @@ var builder = WebApplication.CreateBuilder(args);
 builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor(); //there was an error in netlify login so i added this line
 builder.Services.AddScoped<ITemplateEngine, TemplateEngine>();
-builder.Services.AddScoped<JwtHelper>();
-builder.Services.AddScoped<TokenService>();
+builder.Services.AddScoped<JwtHelper>();// In Program.cs or Startup.cs
+builder.Services.AddScoped<IUnifiedDeploymentService, UnifiedDeploymentService>();// In Program.cs or Startup.cs
+//builder.Services.AddScoped<ITokenService, TokenService>();
 // Authentication registration (fixed: single AddAuthentication with chained handlers)
 builder.Services.AddAuthentication(options =>
 {
