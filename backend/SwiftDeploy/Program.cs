@@ -1,6 +1,3 @@
-
-=========
->>>>>>>>> Temporary merge branch 2
 using Microsoft.AspNetCore.Authentication;
 using Microsoft.AspNetCore.Authentication.Cookies;
 using Microsoft.AspNetCore.Authentication.JwtBearer;
@@ -25,10 +22,7 @@ builder.Services.AddHttpClient();
 builder.Services.AddHttpContextAccessor(); //there was an error in netlify login so i added this line
 builder.Services.AddScoped<ITemplateEngine, TemplateEngine>();
 builder.Services.AddScoped<JwtHelper>();
-
-builder.Services.AddAuthentication(options =>
-{
-builder.Services.AddScoped<JwtHelper>();
+// Authentication registration (fixed: single AddAuthentication with chained handlers)
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
@@ -70,283 +64,190 @@ builder.Services.AddAuthentication(options =>
     };
 })
 .AddOAuth("GitHub", options =>
-{
-    options.ClientId = builder.Configuration["GitHub:ClientId"];
-    options.ClientSecret = builder.Configuration["GitHub:ClientSecret"];
-    options.CallbackPath = new PathString("/api/auth/github/callback");
-
-    options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
-    options.TokenEndpoint = "https://github.com/login/oauth/access_token";
-    options.UserInformationEndpoint = "https://api.github.com/user";
-
-    options.Scope.Add("read:user");
-    options.Scope.Add("repo");
-    options.Scope.Add("user:email");
-
-    options.SaveTokens = true;
-
-    options.CorrelationCookie.SameSite = SameSiteMode.None;
-    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.CorrelationCookie.IsEssential = true;
-    options.CorrelationCookie.Path = "/";
-
-    options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
-    options.ClaimActions.MapJsonKey(ClaimTypes.Name, "login");
-    options.ClaimActions.MapJsonKey("urn:github:avatar", "avatar_url");
-
-    options.Events = new OAuthEvents
     {
-        OnCreatingTicket = async context =>
+        options.ClientId = builder.Configuration["GitHub:ClientId"];
+        options.ClientSecret = builder.Configuration["GitHub:ClientSecret"];
+        options.CallbackPath = new PathString("/api/auth/github/callback");
+
+        options.AuthorizationEndpoint = "https://github.com/login/oauth/authorize";
+        options.TokenEndpoint = "https://github.com/login/oauth/access_token";
+        options.UserInformationEndpoint = "https://api.github.com/user";
+
+        options.Scope.Add("read:user");
+        options.Scope.Add("repo");
+        options.Scope.Add("user:email");
+
+        options.SaveTokens = true;
+
+        options.CorrelationCookie.SameSite = SameSiteMode.None;
+        options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.CorrelationCookie.IsEssential = true;
+        options.CorrelationCookie.Path = "/";
+
+        options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
+        options.ClaimActions.MapJsonKey(ClaimTypes.Name, "login");
+        options.ClaimActions.MapJsonKey("urn:github:avatar", "avatar_url");
+
+        options.Events = new OAuthEvents
         {
-            var accessToken = context.AccessToken;
-            context.Response.Cookies.Append("GitHubAccessToken", accessToken, new CookieOptions
+            OnCreatingTicket = async context =>
             {
-                HttpOnly = false,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                IsEssential = true,
-                Path = "/"
-            });
+                var accessToken = context.AccessToken;
+                context.Response.Cookies.Append("GitHubAccessToken", accessToken, new CookieOptions
+                {
+                    HttpOnly = false,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    IsEssential = true,
+                    Path = "/"
+                });
 
-            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
-            request.Headers.Add("User-Agent", "SwiftDeployApp");
+                var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
+                request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
+                request.Headers.Add("User-Agent", "SwiftDeployApp");
 
-            var response = await context.Backchannel.SendAsync(request);
-            response.EnsureSuccessStatusCode();
+                var response = await context.Backchannel.SendAsync(request);
+                response.EnsureSuccessStatusCode();
 
-            using var user = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            context.RunClaimActions(user.RootElement);
-        },
-        OnTicketReceived = async context =>
-        {
-            var redirectUri = "http://localhost:5173/auth-callback";
-            context.Response.Redirect(redirectUri);
-            context.HandleResponse();
-        }
-    };
-})
-.AddOAuth("Netlify", options =>
-{
-    options.ClientId = builder.Configuration["Netlify:ClientId"];
-    options.ClientSecret = builder.Configuration["Netlify:ClientSecret"];
-    options.CallbackPath = new PathString("/api/auth/netlify/callback");
-
-    options.AuthorizationEndpoint = "https://app.netlify.com/authorize";
-    options.TokenEndpoint = "https://api.netlify.com/oauth/token";
-    options.UserInformationEndpoint = "https://api.netlify.com/api/v1/user";
-
-    options.SaveTokens = true;
-
-    options.CorrelationCookie.SameSite = SameSiteMode.None;
-    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.CorrelationCookie.IsEssential = true;
-    options.CorrelationCookie.Path = "/";
-
-    options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
-    options.ClaimActions.MapJsonKey(ClaimTypes.Name, "full_name");
-    options.ClaimActions.MapJsonKey("urn:netlify:email", "email");
-
-    options.Events = new OAuthEvents
-    {
-        OnCreatingTicket = async context =>
-        {
-            var accessToken = context.AccessToken;
-            context.Response.Cookies.Append("NetlifyAccessToken", accessToken, new CookieOptions
+                using var user = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                context.RunClaimActions(user.RootElement);
+            },
+            OnTicketReceived = async context =>
             {
-                HttpOnly = false,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                IsEssential = true,
-                Path = "/"
-            });
-
-            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-            request.Headers.Authorization =
-                new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
-
-            var response = await context.Backchannel.SendAsync(request);
-            response.EnsureSuccessStatusCode();
-
-            using var user = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
-            context.RunClaimActions(user.RootElement);
-        },
-        OnTicketReceived = async context =>
-        {
-            var redirectUri = "http://localhost:5173/netlify-callback";
-            context.Response.Redirect(redirectUri);
-            context.HandleResponse();
-        }
-    };
-})
-.AddOAuth("Vercel", options =>
-{
-    options.ClientId = builder.Configuration["Vercel:ClientId"];
-    options.ClientSecret = builder.Configuration["Vercel:ClientSecret"];
-    options.CallbackPath = new PathString("/api/auth/vercel/callback");
-
-    options.AuthorizationEndpoint = "https://vercel.com/oauth/authorize";
-    options.TokenEndpoint = "https://api.vercel.com/v2/oauth/access_token";
-    options.UserInformationEndpoint = "https://api.vercel.com/v2/user";
-
-    options.Scope.Add("all");
-    options.SaveTokens = true;
-
-    // CRITICAL: Skip state validation for Vercel since they don't always send it back
-    options.UsePkce = false;
-    //options.SkipUnrecognizedRequests = true;
-    // Remove this line, as 'SkipUnrecognizedRequests' does not exist on OAuthOptions:
-    // options.SkipUnrecognizedRequests = true;
-    options.CorrelationCookie.SameSite = SameSiteMode.None;
-    options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
-    options.CorrelationCookie.IsEssential = true;
-    options.CorrelationCookie.Path = "/";
-
-    options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
-    options.ClaimActions.MapJsonKey(ClaimTypes.Name, "username");
-    options.ClaimActions.MapJsonKey(ClaimTypes.Email, "email");
-
-    options.SignInScheme = CookieAuthenticationDefaults.AuthenticationScheme;
-
-    options.Events = new OAuthEvents
-    {
-        OnCreatingTicket = async context =>
-        {
-            Console.WriteLine("--- Vercel OnCreatingTicket ---");
-            Console.WriteLine($"Access Token: {context.AccessToken}");
-
-            var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
-            request.Headers.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
-
-            var response = await context.Backchannel.SendAsync(request);
-
-            if (!response.IsSuccessStatusCode)
-            {
-                var error = await response.Content.ReadAsStringAsync();
-                Console.WriteLine($"Failed to get user info: {error}");
-                throw new Exception($"Failed to retrieve Vercel user information: {error}");
+                var redirectUri = "http://localhost:5173/auth-callback";
+                context.Response.Redirect(redirectUri);
+                context.HandleResponse();
             }
+        };
+    })
+    .AddOAuth("Netlify", options =>
+    {
+        options.ClientId = builder.Configuration["Netlify:ClientId"];
+        options.ClientSecret = builder.Configuration["Netlify:ClientSecret"];
+        options.CallbackPath = new PathString("/api/auth/netlify/callback");
 
-            var userJson = await response.Content.ReadAsStringAsync();
-            Console.WriteLine($"User Info: {userJson}");
+        options.AuthorizationEndpoint = "https://app.netlify.com/authorize";
+        options.TokenEndpoint = "https://api.netlify.com/oauth/token";
+        options.UserInformationEndpoint = "https://api.netlify.com/api/v1/user";
 
-            var user = JsonDocument.Parse(userJson).RootElement;
-            context.RunClaimActions(user);
+        options.SaveTokens = true;
 
-            context.Response.Cookies.Append("VercelAccessToken", context.AccessToken!, new CookieOptions
-            {
-                HttpOnly = false,
-                Secure = true,
-                SameSite = SameSiteMode.None,
-                IsEssential = true,
-                Path = "/"
-            });
-        },
-        OnTicketReceived = async context =>
+        options.CorrelationCookie.SameSite = SameSiteMode.None;
+        options.CorrelationCookie.SecurePolicy = CookieSecurePolicy.Always;
+        options.CorrelationCookie.IsEssential = true;
+        options.CorrelationCookie.Path = "/";
+
+        options.ClaimActions.MapJsonKey(ClaimTypes.NameIdentifier, "id");
+        options.ClaimActions.MapJsonKey(ClaimTypes.Name, "full_name");
+        options.ClaimActions.MapJsonKey("urn:netlify:email", "email");
+
+        options.Events = new OAuthEvents
         {
-            Console.WriteLine("--- Vercel OnTicketReceived ---");
-            var redirectUri = "http://localhost:5173/vercel-callback";
-            Console.WriteLine($"Redirecting to: {redirectUri}");
-
-            context.Response.Redirect(redirectUri);
-            context.HandleResponse();
-        },
-        OnRemoteFailure = context =>
-        {
-            Console.WriteLine("--- Vercel OnRemoteFailure ---");
-            Console.WriteLine($"Error: {context.Failure?.Message}");
-
-            // If state validation fails, try to handle it manually
-            if (context.Failure?.Message?.Contains("state") == true)
+            OnCreatingTicket = async context =>
             {
-                Console.WriteLine("State validation failed - will be handled by controller");
-                // Don't handle here, let it pass through to controller
-                context.SkipHandler();
-                return Task.CompletedTask;
-        }
+                var accessToken = context.AccessToken;
+                context.Response.Cookies.Append("NetlifyAccessToken", accessToken, new CookieOptions
+                {
+                    HttpOnly = false,
+                    Secure = true,
+                    SameSite = SameSiteMode.None,
+                    IsEssential = true,
+                    Path = "/"
+                });
 
-            context.Response.Redirect("http://localhost:5173/vercel-callback?error=auth_failed");
-            context.HandleResponse();
-            return Task.CompletedTask;
-        }
-    };
-});
+                var request = new HttpRequestMessage(HttpMethod.Get, context.Options.UserInformationEndpoint);
+                request.Headers.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", context.AccessToken);
 
-builder.Services.Configure<MongoDbSettings>(
-    builder.Configuration.GetSection("MongoDbSettings"));
+                var response = await context.Backchannel.SendAsync(request);
+                response.EnsureSuccessStatusCode();
 
-builder.Services.AddSingleton<MongoDbService>();
-builder.Services.AddSingleton<IMongoClient>(sp =>
-{
-    var settings = builder.Configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>();
-    return new MongoClient(settings.ConnectionString);
-});
+                using var user = JsonDocument.Parse(await response.Content.ReadAsStringAsync());
+                context.RunClaimActions(user.RootElement);
+            },
+            OnTicketReceived = async context =>
+            {
+                var redirectUri = "http://localhost:5173/netlify-callback";
+                context.Response.Redirect(redirectUri);
+                context.HandleResponse();
+            }
+        };
+    });
 
-builder.Services.AddSingleton<IMongoDatabase>(sp =>
-{
-    var mongoClient = sp.GetRequiredService<IMongoClient>();
-    return mongoClient.GetDatabase("SwiftDeploy");
-});
+    builder.Services.Configure<MongoDbSettings>(
+        builder.Configuration.GetSection("MongoDbSettings"));
 
-builder.Services.AddControllers();
-builder.Services.AddEndpointsApiExplorer();
-builder.Services.AddSwaggerGen();
-
-builder.Services.AddCookiePolicy(options =>
-{
-    options.MinimumSameSitePolicy = SameSiteMode.None;
-    options.OnAppendCookie = cookieContext =>
+    builder.Services.AddSingleton<MongoDbService>();
+    builder.Services.AddSingleton<IMongoClient>(sp =>
     {
-        cookieContext.CookieOptions.SameSite = SameSiteMode.None;
-        cookieContext.CookieOptions.Secure = true;
-        cookieContext.CookieOptions.IsEssential = true;
-    };
-    options.OnDeleteCookie = cookieContext =>
+        var settings = builder.Configuration.GetSection("MongoDbSettings").Get<MongoDbSettings>();
+        return new MongoClient(settings.ConnectionString);
+    });
+
+    builder.Services.AddSingleton<IMongoDatabase>(sp =>
     {
-        cookieContext.CookieOptions.SameSite = SameSiteMode.None;
-        cookieContext.CookieOptions.Secure = true;  
-        cookieContext.CookieOptions.IsEssential = true;
-    };
-});
+        var mongoClient = sp.GetRequiredService<IMongoClient>();
+        return mongoClient.GetDatabase("SwiftDeploy");
+    });
 
-var app = builder.Build();
+    builder.Services.AddControllers();
+    builder.Services.AddEndpointsApiExplorer();
+    builder.Services.AddSwaggerGen();
 
-app.UseCors(builder =>
-    builder.WithOrigins("http://localhost:5173", "https://localhost:5174") // Add https origin for frontend if applicable
-           .AllowAnyHeader()
-           .AllowAnyMethod()
-           .AllowCredentials());
-
-if (app.Environment.IsDevelopment())
-{
-    app.UseSwagger();
-    app.UseSwaggerUI();
-}
-
-app.UseHttpsRedirection();
-app.UseRouting();
-
-app.UseCookiePolicy();
-app.UseAuthentication();
-app.UseAuthorization();
-
-// Debug: log all registered endpoints to help find ambiguous routes
-var endpointDataSource = app.Services.GetRequiredService<EndpointDataSource>();
-var logger = app.Services.GetRequiredService<ILogger<Program>>();
-logger.LogInformation("Registered endpoints:");
-foreach (var endpoint in endpointDataSource.Endpoints)
-{
-    if (endpoint is RouteEndpoint routeEndpoint)
+    builder.Services.AddCookiePolicy(options =>
     {
-        var methods = routeEndpoint.Metadata.OfType<HttpMethodMetadata>().FirstOrDefault()?.HttpMethods ?? new[] { "ANY" };
-        logger.LogInformation(" {Methods}  {RoutePattern}  => {DisplayName}",
-            string.Join(",", methods), routeEndpoint.RoutePattern.RawText, routeEndpoint.DisplayName);
+        options.MinimumSameSitePolicy = SameSiteMode.None;
+        options.OnAppendCookie = cookieContext =>
+        {
+            cookieContext.CookieOptions.SameSite = SameSiteMode.None;
+            cookieContext.CookieOptions.Secure = true;
+            cookieContext.CookieOptions.IsEssential = true;
+        };
+        options.OnDeleteCookie = cookieContext =>
+        {
+            cookieContext.CookieOptions.SameSite = SameSiteMode.None;
+            cookieContext.CookieOptions.Secure = true;
+            cookieContext.CookieOptions.IsEssential = true;
+        };
+    });
+
+    var app = builder.Build();
+
+    app.UseCors(builder =>
+        builder.WithOrigins("http://localhost:5173", "https://localhost:5174") // Add https origin for frontend if applicable
+               .AllowAnyHeader()
+               .AllowAnyMethod()
+               .AllowCredentials());
+
+    if (app.Environment.IsDevelopment())
+    {
+        app.UseSwagger();
+        app.UseSwaggerUI();
     }
-    else
+
+    app.UseHttpsRedirection();
+    app.UseRouting();
+
+    app.UseCookiePolicy();
+    app.UseAuthentication();
+    app.UseAuthorization();
+
+    // Debug: log all registered endpoints to help find ambiguous routes
+    var endpointDataSource = app.Services.GetRequiredService<EndpointDataSource>();
+    var logger = app.Services.GetRequiredService<ILogger<Program>>();
+    logger.LogInformation("Registered endpoints:");
+    foreach (var endpoint in endpointDataSource.Endpoints)
     {
-        logger.LogInformation(" {Endpoint}", endpoint.DisplayName ?? endpoint.ToString());
+        if (endpoint is RouteEndpoint routeEndpoint)
+        {
+            var methods = routeEndpoint.Metadata.OfType<HttpMethodMetadata>().FirstOrDefault()?.HttpMethods ?? new[] { "ANY" };
+            logger.LogInformation(" {Methods}  {RoutePattern}  => {DisplayName}",
+                string.Join(",", methods), routeEndpoint.RoutePattern.RawText, routeEndpoint.DisplayName);
+        }
+        else
+        {
+            logger.LogInformation(" {Endpoint}", endpoint.DisplayName ?? endpoint.ToString());
+        }
     }
-app.Run();
-app.MapControllers();
->>>>>>>>> Temporary merge branch 2
-app.Run();
+    app.MapControllers();
+    app.Run();
