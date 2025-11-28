@@ -39,6 +39,7 @@ namespace SwiftDeploy.Models
         public Dictionary<string, string> EnvironmentVariables { get; set; } = new();
         public List<RedirectRule> Redirects { get; set; } = new();
         public List<HeaderRule> Headers { get; set; } = new();
+        public string TeamId { get; set; } = "";// Default to personal account
 
         public bool EnableHttps { get; set; } = true;
 

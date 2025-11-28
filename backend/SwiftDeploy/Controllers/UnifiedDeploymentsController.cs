@@ -7,6 +7,7 @@ using SwiftDeploy.Services;
 using SwiftDeploy.Services.Interfaces;
 using System.Collections.Concurrent;
 using System.Security.Claims;
+using System.Text;
 using System.Text.Json;
 using DeploymentStatus = SwiftDeploy.Models.DeploymentStatus;
 namespace SwiftDeploy.Controllers
@@ -863,50 +864,176 @@ namespace SwiftDeploy.Controllers
             }
         }
 
-        private async Task<DeploymentResponse> DeployToVercelWithUserRepo(string repoPath, string branch, CommonConfig config, string vercelToken, string githubToken)
+        private async Task<DeploymentResponse> DeployToVercelWithUserRepo(
+      string repoPath,
+      string branch,
+      CommonConfig config,
+      string vercelToken,
+      string githubToken)
         {
             try
             {
-                using var client = new HttpClient();
-                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", vercelToken);
+                if (string.IsNullOrWhiteSpace(repoPath))
+                    return new DeploymentResponse { Success = false, Message = "Repository path missing" };
 
-                // Split repo path (e.g., "tamannashah18/Test-Repository-static")
+                branch ??= "main";
+
+                // Build request payload
                 var repoParts = repoPath.Split('/');
-                var owner = repoParts[0];
-                var repoName = repoParts[1];
+                if (repoParts.Length < 2)
+                    return new DeploymentResponse { Success = false, Message = "Repository path must be in format 'owner/repo'" };
 
-                var payload = new
+                var requestData = new
                 {
-                    name = $"swiftdeploy-{Guid.NewGuid().ToString()[..8]}",
-                    gitSource = new
+                    Owner = repoParts[0],
+                    RepoName = repoParts[1],
+                    Branch = branch,
+                    BuildCommand = config?.BuildCommand ?? "",
+                    BuildDir = config?.OutputDirectory ?? ".",
+                    InstallCommand = config?.InstallCommand ?? "npm install",
+                    Framework = config?.Framework ?? "",
+                    TeamId = config?.TeamId?.ToString() ?? "",
+                    EnvironmentVariables = config?.EnvironmentVariables?
+                        .Select(kv => new { name = kv.Key, value = kv.Value })
+                        .ToArray()
+                };
+
+                // Call internal Vercel controller
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                var initiateUrl = $"{baseUrl}/api/vercel/initiate";
+
+                using var client = new HttpClient();
+
+                // Add Vercel API token
+                if (!string.IsNullOrWhiteSpace(vercelToken))
+                    client.DefaultRequestHeaders.Add("Vercel-Api-Token", vercelToken);
+                else
+                    return new DeploymentResponse { Success = false, Message = "Vercel token is required" };
+
+                // Add GitHub token
+                if (!string.IsNullOrWhiteSpace(githubToken))
+                    client.DefaultRequestHeaders.Add("GitHub-Api-Token", githubToken);
+
+                var json = JsonSerializer.Serialize(requestData);
+                var resp = await client.PostAsync(initiateUrl, new StringContent(json, Encoding.UTF8, "application/json"));
+                var body = await resp.Content.ReadAsStringAsync();
+
+                _logger.LogInformation("Vercel controller response ({Status}):\n{Body}", resp.StatusCode, body);
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    // Extract error message
+                    try
                     {
-                        type = "github",
-                        repo = repoPath,
-                        ref_ = branch
-                    },
-                    buildCommand = config.BuildCommand ?? "",
-                    outputDirectory = config.OutputDirectory ?? ".",
-                    installCommand = config.InstallCommand ?? "npm install"
-                };
+                        using var doc = JsonDocument.Parse(body);
+                        if (doc.RootElement.TryGetProperty("error", out var error))
+                        {
+                            return new DeploymentResponse
+                            {
+                                Success = false,
+                                Message = $"Vercel error: {error.GetString()}"
+                            };
+                        }
+                        if (doc.RootElement.TryGetProperty("message", out var msg))
+                        {
+                            return new DeploymentResponse
+                            {
+                                Success = false,
+                                Message = $"Vercel error: {msg.GetString()}"
+                            };
+                        }
+                    }
+                    catch { /* ignore parse errors */ }
 
-                var deployResponse = await client.PostAsJsonAsync("https://api.vercel.com/v13/deployments", payload);
-                var body = await deployResponse.Content.ReadAsStringAsync();
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"Vercel deployment failed: {body}"
+                    };
+                }
 
-                if (!deployResponse.IsSuccessStatusCode)
-                    throw new Exception($"Vercel deployment failed: {body}");
-
-                var data = JsonDocument.Parse(body);
-                var deploymentUrl = data.RootElement.GetProperty("url").GetString();
-
-                return new DeploymentResponse
+                // ⭐ Parse success response and extract deployment URL
+                try
                 {
-                    Success = true,
-                    Message = "Vercel deployment started successfully",
-                    DeploymentUrl = $"https://{deploymentUrl}"
-                };
+                    using var doc = JsonDocument.Parse(body);
+                    var root = doc.RootElement;
+
+                    string deploymentUrl = null;
+                    string projectName = null;
+
+                    // ⭐ Extract project name first
+                    if (root.TryGetProperty("projectName", out var projNameProp))
+                    {
+                        projectName = projNameProp.GetString();
+                    }
+
+                    // ⭐ Try to get deploymentUrl directly
+                    if (root.TryGetProperty("deploymentUrl", out var deployProp))
+                    {
+                        deploymentUrl = deployProp.GetString();
+                    }
+                    // ⭐ Try projectUrl
+                    else if (root.TryGetProperty("projectUrl", out var projUrlProp))
+                    {
+                        deploymentUrl = projUrlProp.GetString();
+                    }
+                    // ⭐ Try nested deployment.url
+                    else if (root.TryGetProperty("deployment", out var depObj) &&
+                             depObj.ValueKind == JsonValueKind.Object)
+                    {
+                        if (depObj.TryGetProperty("url", out var urlProp))
+                        {
+                            deploymentUrl = urlProp.GetString();
+                        }
+                    }
+
+                    // ⭐ If we have projectName but no URL, construct it
+                    if (string.IsNullOrEmpty(deploymentUrl) && !string.IsNullOrEmpty(projectName))
+                    {
+                        deploymentUrl = $"https://{projectName}.vercel.app";
+                    }
+
+                    // ⭐ Ensure URL has https://
+                    if (!string.IsNullOrEmpty(deploymentUrl))
+                    {
+                        if (!deploymentUrl.StartsWith("http"))
+                        {
+                            deploymentUrl = $"https://{deploymentUrl}";
+                        }
+
+                        // ⭐ Ensure it ends with /
+                        if (!deploymentUrl.EndsWith("/"))
+                        {
+                            deploymentUrl += "/";
+                        }
+                    }
+
+                    _logger.LogInformation("✅ Vercel deployment URL: {Url}", deploymentUrl);
+
+                    return new DeploymentResponse
+                    {
+                        Success = true,
+                        Message = "Vercel deployment initiated successfully",
+                        DeploymentUrl = deploymentUrl,  // ⭐ Clean URL like https://swiftdeploy-vc-test.vercel.app/
+                        GitHubRepoUrl = $"https://github.com/{repoPath}",
+                        ProjectId = root.TryGetProperty("projectId", out var pid) ? pid.GetString() : null
+                    };
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogWarning(ex, "Failed to parse Vercel response");
+                    return new DeploymentResponse
+                    {
+                        Success = true,
+                        Message = "Vercel deployment initiated (response parsing failed)",
+                        DeploymentUrl = null,
+                        GitHubRepoUrl = $"https://github.com/{repoPath}"
+                    };
+                }
             }
             catch (Exception ex)
             {
+                _logger.LogError(ex, "Error calling Vercel controller");
                 return new DeploymentResponse
                 {
                     Success = false,
@@ -914,6 +1041,5 @@ namespace SwiftDeploy.Controllers
                 };
             }
         }
-
     } // ← This closes the UnifiedDeploymentController class
 }     // ← This closes the namespace
