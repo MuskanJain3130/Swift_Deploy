@@ -1,15 +1,15 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using Octokit;
 using SwiftDeploy.Models;
 using SwiftDeploy.Models.SwiftDeploy.Models;
 using SwiftDeploy.Services;
+using SwiftDeploy.Services.Interfaces;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using SwiftDeploy.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace SwiftDeploy.Controllers
 {
@@ -19,11 +19,13 @@ namespace SwiftDeploy.Controllers
     {
         private readonly GitHubClient _githubClient;
         private readonly MongoDbService _mongo;
+        //private readonly ILoggingService _loggingService;
 
         public RepositoriesController(MongoDbService mongo)
         {
             _githubClient = new GitHubClient(new ProductHeaderValue("SwiftDeployApp"));
             _mongo = mongo;
+            //_loggingService = loggingService;
         }
 
         /// <summary>
@@ -318,16 +320,24 @@ namespace SwiftDeploy.Controllers
                             owner = analysis.Owner,
                             name = analysis.RepoName
                         },
+                        projectInfo = new
+                        {
+                            type = analysis.ProjectType ?? "Unknown",
+                            language = analysis.Language ?? "Unknown",
+                            frontendFramework = analysis.Framework ?? "None",
+                            backendFramework = analysis.BackendFramework ?? "None"
+                        },
                         detectedTechnologies = new
                         {
-                            framework = analysis.Framework ?? "Unknown",
                             buildTool = analysis.BuildTool ?? "None",
                             packageManager = analysis.PackageManager ?? "None",
                             technologies = analysis.DetectedTechnologies,
                             isStatic = analysis.IsStatic,
                             hasSSR = analysis.HasServerSideRendering,
                             hasEdgeFunctions = analysis.HasEdgeFunctions,
-                            hasApiRoutes = analysis.HasApiRoutes
+                            hasApiRoutes = analysis.HasApiRoutes,
+                            hasDatabase = analysis.HasDatabase,
+                            hasDocker = analysis.HasDocker
                         },
                         recommendedPlatform = analysis.RecommendedPlatform,
                         allSuggestions = analysis.Suggestions.Select(s => new
@@ -341,6 +351,7 @@ namespace SwiftDeploy.Controllers
                     }
                 });
             }
+
             catch (AuthorizationException ex)
             {
                 Console.WriteLine($"GitHub authorization failed: {ex.Message}");
