@@ -1,15 +1,15 @@
-﻿using Microsoft.AspNetCore.Http;
+﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using Octokit;
 using SwiftDeploy.Models;
 using SwiftDeploy.Models.SwiftDeploy.Models;
 using SwiftDeploy.Services;
+using SwiftDeploy.Services.Interfaces;
 using System.Linq;
 using System.Security.Claims;
 using System.Threading.Tasks;
-using SwiftDeploy.Models;
-using Microsoft.AspNetCore.Authorization;
 
 namespace SwiftDeploy.Controllers
 {
@@ -19,11 +19,13 @@ namespace SwiftDeploy.Controllers
     {
         private readonly GitHubClient _githubClient;
         private readonly MongoDbService _mongo;
+        //private readonly ILoggingService _loggingService;
 
         public RepositoriesController(MongoDbService mongo)
         {
             _githubClient = new GitHubClient(new ProductHeaderValue("SwiftDeployApp"));
             _mongo = mongo;
+            //_loggingService = loggingService;
         }
 
         /// <summary>
