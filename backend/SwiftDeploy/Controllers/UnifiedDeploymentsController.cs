@@ -226,7 +226,8 @@ namespace SwiftDeploy.Controllers
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
-                var supportedPlatforms = new[] { "vercel", "cloudflare", "netlify" };
+                // ⭐ Add GitHub Pages to supported platforms
+                var supportedPlatforms = new[] { "vercel", "cloudflare", "netlify", "githubpages" };
                 if (!supportedPlatforms.Contains(request.Platform.ToLower()))
                     return BadRequest($"Unsupported platform: {request.Platform}");
 
@@ -243,17 +244,21 @@ namespace SwiftDeploy.Controllers
                     });
                 }
 
-                // ⭐ ADD THIS: Get platform token (Cloudflare/Netlify/Vercel)
-                var platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
-                if (string.IsNullOrEmpty(platformToken))
+                // ⭐ Get platform token (skip for GitHub Pages)
+                string platformToken = null;
+                if (request.Platform.ToLower() != "githubpages")
                 {
-                    return BadRequest(new
+                    platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
+                    if (string.IsNullOrEmpty(platformToken))
                     {
-                        success = false,
-                        message = $"No {request.Platform} token found. Please connect your {request.Platform} account.",
-                        platform = request.Platform,
-                        userId = request.UserId
-                    });
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = $"No {request.Platform} token found. Please connect your {request.Platform} account.",
+                            platform = request.Platform,
+                            userId = request.UserId
+                        });
+                    }
                 }
 
                 // Initialize project tracking
@@ -273,38 +278,47 @@ namespace SwiftDeploy.Controllers
 
                 _logger.LogInformation($"Starting GitHub deployment for {request.GitHubRepo} on {request.Platform}");
 
-                // Step 1: Generate and save config
-                await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating and saving configuration...");
+                // ⭐ Step 1: Generate and save config (skip for GitHub Pages)
+                string configFileUrl = null;
 
-                var configContent = await _templateEngine.GenerateConfigAsync(request.Platform, request.Config);
-                var fileName = _templateEngine.GetConfigFileName(request.Platform);
-
-                // Push config to user's GitHub repo - ⭐ Use githubToken variable
-                var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
-                var configResult = await gitHubService.GenerateAndSaveConfigAsync(
-                    request.Platform,
-                    request.GitHubRepo,
-                    githubToken,  // ⭐ Changed from request.GitHubToken
-                    request.Branch ?? "main",
-                    request.Config
-                );
-
-                if (!configResult.Success)
+                if (request.Platform.ToLower() != "githubpages")
                 {
-                    await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed,
-                        $"Failed to save config: {configResult.Message}");
+                    await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating and saving configuration...");
 
-                    return BadRequest(new DeploymentResponse
+                    var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
+                    var configResult = await gitHubService.GenerateAndSaveConfigAsync(
+                        request.Platform,
+                        request.GitHubRepo,
+                        githubToken,
+                        request.Branch ?? "main",
+                        request.Config
+                    );
+
+                    if (!configResult.Success)
                     {
-                        Success = false,
-                        Message = $"Failed to save config to GitHub: {configResult.Message}",
-                        ProjectId = projectId,
-                        GitHubRepoUrl = projectInfo.GitHubRepoUrl,
-                        Status = DeploymentStatus.Failed
-                    });
+                        await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed,
+                            $"Failed to save config: {configResult.Message}");
+
+                        return BadRequest(new DeploymentResponse
+                        {
+                            Success = false,
+                            Message = $"Failed to save config to GitHub: {configResult.Message}",
+                            ProjectId = projectId,
+                            GitHubRepoUrl = projectInfo.GitHubRepoUrl,
+                            Status = DeploymentStatus.Failed
+                        });
+                    }
+
+                    configFileUrl = configResult.FileUrl;
+                    _logger.LogInformation($"✅ Config file saved: {configFileUrl}");
+                }
+                else
+                {
+                    // ⭐ GitHub Pages doesn't need config file
+                    _logger.LogInformation("Skipping config generation for GitHub Pages");
                 }
 
-                // Step 2: Deploy to platform - ⭐ Now platformToken is defined
+                // ⭐ Step 2: Deploy to platform
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Deploying, $"Deploying to {request.Platform}...");
 
                 DeploymentResponse deploymentResult = request.Platform.ToLower() switch
@@ -312,6 +326,7 @@ namespace SwiftDeploy.Controllers
                     "cloudflare" => await DeployToCloudflareWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, githubToken),
                     "netlify" => await DeployToNetlifyWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, githubToken),
                     "vercel" => await DeployToVercelWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, githubToken),
+                    "githubpages" => await DeployToGitHubPagesWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, githubToken),
                     _ => throw new ArgumentException($"Unsupported platform: {request.Platform}")
                 };
 
@@ -320,11 +335,15 @@ namespace SwiftDeploy.Controllers
                     await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Completed, "Deployment completed successfully!");
                     projectInfo.DeploymentUrl = deploymentResult.DeploymentUrl;
                     projectInfo.Status = DeploymentStatus.Completed;
+
+                    _logger.LogInformation($"✅ Deployment completed: {deploymentResult.DeploymentUrl}");
                 }
                 else
                 {
                     await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, deploymentResult.Message);
                     projectInfo.Status = DeploymentStatus.Failed;
+
+                    _logger.LogError($"❌ Deployment failed: {deploymentResult.Message}");
                 }
 
                 return Ok(new DeploymentResponse
@@ -334,7 +353,7 @@ namespace SwiftDeploy.Controllers
                     ProjectId = projectId,
                     GitHubRepoUrl = projectInfo.GitHubRepoUrl,
                     DeploymentUrl = deploymentResult.DeploymentUrl,
-                    ConfigFileUrl = configResult.FileUrl,
+                    ConfigFileUrl = configFileUrl,  // ⭐ Will be null for GitHub Pages
                     Status = projectInfo.Status
                 });
             }
@@ -352,8 +371,6 @@ namespace SwiftDeploy.Controllers
                 });
             }
         }
-
-
         [HttpGet("projects")]
         public async Task<IActionResult> GetUserProjects([FromQuery] string userId = null)
         {
@@ -883,22 +900,98 @@ namespace SwiftDeploy.Controllers
                 if (repoParts.Length < 2)
                     return new DeploymentResponse { Success = false, Message = "Repository path must be in format 'owner/repo'" };
 
+                var owner = repoParts[0];
+                var repoName = repoParts[1];
+
+                // ⭐ STEP 1: Fetch RepoId and CommitSha from GitHub API
+                long repoId = 0;
+                string commitSha = null;
+
+                try
+                {
+                    using var githubClient = new HttpClient();
+                    githubClient.DefaultRequestHeaders.UserAgent.ParseAdd("SwiftDeploy/1.0");
+
+                    if (!string.IsNullOrWhiteSpace(githubToken))
+                    {
+                        githubClient.DefaultRequestHeaders.Authorization =
+                            new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", githubToken);
+                    }
+
+                    // Get repository info (for repoId)
+                    var repoUrl = $"https://api.github.com/repos/{owner}/{repoName}";
+                    var repoResponse = await githubClient.GetAsync(repoUrl);
+
+                    if (!repoResponse.IsSuccessStatusCode)
+                    {
+                        var errorBody = await repoResponse.Content.ReadAsStringAsync();
+                        _logger.LogError("Failed to fetch GitHub repo info: {Error}", errorBody);
+                        return new DeploymentResponse
+                        {
+                            Success = false,
+                            Message = $"Failed to fetch repository info from GitHub: {errorBody}"
+                        };
+                    }
+
+                    var repoJson = await repoResponse.Content.ReadAsStringAsync();
+                    var repoDoc = JsonDocument.Parse(repoJson);
+                    repoId = repoDoc.RootElement.GetProperty("id").GetInt64();
+
+                    _logger.LogInformation("✅ GitHub Repo ID: {RepoId}", repoId);
+
+                    // Get latest commit SHA for the branch
+                    var branchUrl = $"https://api.github.com/repos/{owner}/{repoName}/branches/{branch}";
+                    var branchResponse = await githubClient.GetAsync(branchUrl);
+
+                    if (!branchResponse.IsSuccessStatusCode)
+                    {
+                        var errorBody = await branchResponse.Content.ReadAsStringAsync();
+                        _logger.LogError("Failed to fetch branch info: {Error}", errorBody);
+                        return new DeploymentResponse
+                        {
+                            Success = false,
+                            Message = $"Failed to fetch branch '{branch}' from GitHub: {errorBody}"
+                        };
+                    }
+
+                    var branchJson = await branchResponse.Content.ReadAsStringAsync();
+                    var branchDoc = JsonDocument.Parse(branchJson);
+                    commitSha = branchDoc.RootElement
+                        .GetProperty("commit")
+                        .GetProperty("sha")
+                        .GetString();
+
+                    _logger.LogInformation("✅ Latest Commit SHA: {CommitSha}", commitSha);
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error fetching GitHub repository information");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"Failed to fetch GitHub info: {ex.Message}"
+                    };
+                }
+
+                // ⭐ STEP 2: Build request payload with RepoId and CommitSha
                 var requestData = new
                 {
-                    Owner = repoParts[0],
-                    RepoName = repoParts[1],
+                    Owner = owner,
+                    RepoName = repoName,
                     Branch = branch,
-                    BuildCommand = config?.BuildCommand ?? "",
-                    BuildDir = config?.OutputDirectory ?? ".",
-                    InstallCommand = config?.InstallCommand ?? "npm install",
-                    Framework = config?.Framework ?? "",
-                    TeamId = config?.TeamId?.ToString() ?? "",
+                    RepoId = repoId,  // ⭐ Added
+                    CommitSha = commitSha,  // ⭐ Added
+                    BuildCommand = string.IsNullOrWhiteSpace(config?.BuildCommand) ? null : config.BuildCommand,
+                    BuildDir = string.IsNullOrWhiteSpace(config?.OutputDirectory) ? null : config.OutputDirectory,
+                    InstallCommand = string.IsNullOrWhiteSpace(config?.InstallCommand) ? null : config.InstallCommand,
+                    Framework = string.IsNullOrWhiteSpace(config?.Framework) ? null : config.Framework,
+                    TeamId = string.IsNullOrWhiteSpace(config?.TeamId?.ToString()) ? "" : config.TeamId.ToString(),
                     EnvironmentVariables = config?.EnvironmentVariables?
                         .Select(kv => new { name = kv.Key, value = kv.Value })
-                        .ToArray()
+                        .ToArray() ?? Array.Empty<object>()
                 };
 
-                // Call internal Vercel controller
+                // ⭐ STEP 3: Call internal Vercel controller
                 var baseUrl = $"{Request.Scheme}://{Request.Host}";
                 var initiateUrl = $"{baseUrl}/api/vercel/initiate";
 
@@ -914,7 +1007,9 @@ namespace SwiftDeploy.Controllers
                 if (!string.IsNullOrWhiteSpace(githubToken))
                     client.DefaultRequestHeaders.Add("GitHub-Api-Token", githubToken);
 
-                var json = JsonSerializer.Serialize(requestData);
+                var json = JsonSerializer.Serialize(requestData, new JsonSerializerOptions { WriteIndented = true });
+                _logger.LogInformation("Sending to Vercel controller:\n{Payload}", json);
+
                 var resp = await client.PostAsync(initiateUrl, new StringContent(json, Encoding.UTF8, "application/json"));
                 var body = await resp.Content.ReadAsStringAsync();
 
@@ -952,7 +1047,7 @@ namespace SwiftDeploy.Controllers
                     };
                 }
 
-                // ⭐ Parse success response and extract deployment URL
+                // ⭐ STEP 4: Parse success response and extract deployment URL
                 try
                 {
                     using var doc = JsonDocument.Parse(body);
@@ -961,39 +1056,32 @@ namespace SwiftDeploy.Controllers
                     string deploymentUrl = null;
                     string projectName = null;
 
-                    // ⭐ Extract project name first
+                    // Extract project name
                     if (root.TryGetProperty("projectName", out var projNameProp))
                     {
                         projectName = projNameProp.GetString();
                     }
 
-                    // ⭐ Try to get deploymentUrl directly
+                    // Try to get deploymentUrl directly
                     if (root.TryGetProperty("deploymentUrl", out var deployProp))
                     {
                         deploymentUrl = deployProp.GetString();
                     }
-                    // ⭐ Try projectUrl
-                    else if (root.TryGetProperty("projectUrl", out var projUrlProp))
+                    // Try nested deploymentInfo.url
+                    else if (root.TryGetProperty("deploymentInfo", out var depInfo) &&
+                             depInfo.ValueKind == JsonValueKind.Object &&
+                             depInfo.TryGetProperty("url", out var urlProp))
                     {
-                        deploymentUrl = projUrlProp.GetString();
-                    }
-                    // ⭐ Try nested deployment.url
-                    else if (root.TryGetProperty("deployment", out var depObj) &&
-                             depObj.ValueKind == JsonValueKind.Object)
-                    {
-                        if (depObj.TryGetProperty("url", out var urlProp))
-                        {
-                            deploymentUrl = urlProp.GetString();
-                        }
+                        deploymentUrl = urlProp.GetString();
                     }
 
-                    // ⭐ If we have projectName but no URL, construct it
+                    // If we have projectName but no URL, construct it
                     if (string.IsNullOrEmpty(deploymentUrl) && !string.IsNullOrEmpty(projectName))
                     {
                         deploymentUrl = $"https://{projectName}.vercel.app";
                     }
 
-                    // ⭐ Ensure URL has https://
+                    // Ensure URL has https://
                     if (!string.IsNullOrEmpty(deploymentUrl))
                     {
                         if (!deploymentUrl.StartsWith("http"))
@@ -1001,7 +1089,7 @@ namespace SwiftDeploy.Controllers
                             deploymentUrl = $"https://{deploymentUrl}";
                         }
 
-                        // ⭐ Ensure it ends with /
+                        // Ensure it ends with /
                         if (!deploymentUrl.EndsWith("/"))
                         {
                             deploymentUrl += "/";
@@ -1014,7 +1102,7 @@ namespace SwiftDeploy.Controllers
                     {
                         Success = true,
                         Message = "Vercel deployment initiated successfully",
-                        DeploymentUrl = deploymentUrl,  // ⭐ Clean URL like https://swiftdeploy-vc-test.vercel.app/
+                        DeploymentUrl = deploymentUrl,
                         GitHubRepoUrl = $"https://github.com/{repoPath}",
                         ProjectId = root.TryGetProperty("projectId", out var pid) ? pid.GetString() : null
                     };
@@ -1040,6 +1128,488 @@ namespace SwiftDeploy.Controllers
                     Message = $"Vercel deployment error: {ex.Message}"
                 };
             }
+        }
+        // Deploy to GitHub Pages using USER'S GitHub repo
+        private async Task<DeploymentResponse> DeployToGitHubPagesWithUserRepo(
+            string repoPath,
+            string branch,
+            CommonConfig config,
+            string githubToken)
+        {
+            try
+            {
+                if (string.IsNullOrWhiteSpace(repoPath))
+                    return new DeploymentResponse { Success = false, Message = "Repository path missing" };
+
+                branch ??= "main";
+
+                // Split repo path
+                var repoParts = repoPath.Split('/');
+                if (repoParts.Length < 2)
+                    return new DeploymentResponse { Success = false, Message = "Repository path must be in format 'owner/repo'" };
+
+                var owner = repoParts[0];
+                var repoName = repoParts[1];
+
+                _logger.LogInformation("Deploying {Repo} to GitHub Pages on branch {Branch}", repoPath, branch);
+
+                // Call internal GitHub Pages controller
+                var baseUrl = $"{Request.Scheme}://{Request.Host}";
+                var enableUrl = $"{baseUrl}/api/githubpages/enable";
+
+                using var client = new HttpClient();
+
+                // Add GitHub token
+                if (!string.IsNullOrWhiteSpace(githubToken))
+                    client.DefaultRequestHeaders.Add("GitHub-Token", githubToken);
+                else
+                    return new DeploymentResponse { Success = false, Message = "GitHub token is required" };
+
+                // Build request payload
+                var requestData = new
+                {
+                    Owner = owner,
+                    Repo = repoName,
+                    Branch = branch,
+                    Path = config?.OutputDirectory ?? "/",  // "/" or "/docs"
+                    BuildType = config?.Framework ?? "legacy",  // "legacy" or "workflow"
+                    TriggerBuild = true  // Trigger immediate deployment
+                };
+
+                var json = JsonSerializer.Serialize(requestData, new JsonSerializerOptions { WriteIndented = true });
+                _logger.LogInformation("Sending to GitHub Pages controller:\n{Payload}", json);
+
+                var resp = await client.PostAsync(enableUrl, new StringContent(json, Encoding.UTF8, "application/json"));
+                var body = await resp.Content.ReadAsStringAsync();
+
+                _logger.LogInformation("GitHub Pages controller response ({Status}):\n{Body}", resp.StatusCode, body);
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    // Extract error message
+                    try
+                    {
+                        using var doc = JsonDocument.Parse(body);
+                        if (doc.RootElement.TryGetProperty("message", out var msg))
+                        {
+                            return new DeploymentResponse
+                            {
+                                Success = false,
+                                Message = $"GitHub Pages error: {msg.GetString()}"
+                            };
+                        }
+                    }
+                    catch { /* ignore parse errors */ }
+
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"GitHub Pages deployment failed: {body}"
+                    };
+                }
+
+                // Construct GitHub Pages URL
+                // Format: https://{owner}.github.io/{repo}/
+                var deploymentUrl = $"https://{owner}.github.io/{repoName}/";
+
+                _logger.LogInformation("✅ GitHub Pages deployment URL: {Url}", deploymentUrl);
+
+                return new DeploymentResponse
+                {
+                    Success = true,
+                    Message = "GitHub Pages deployment initiated successfully",
+                    DeploymentUrl = deploymentUrl,
+                    GitHubRepoUrl = $"https://github.com/{repoPath}",
+                    ProjectId = null
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error calling GitHub Pages controller");
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = $"GitHub Pages deployment error: {ex.Message}"
+                };
+            }
+        }
+        // ============================================
+        // DELETE DEPLOYMENT METHODS FOR ALL PLATFORMS
+        // ============================================
+
+        /// <summary>
+        /// Delete deployment from any platform
+        /// </summary>
+        [HttpDelete("deployments/{projectId}")]
+        public async Task<IActionResult> DeleteDeployment(string projectId)
+        {
+            try
+            {
+                // Get project info
+                if (!_projects.TryGetValue(projectId, out var project))
+                    return NotFound(new { success = false, message = "Project not found" });
+
+                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                if (string.IsNullOrEmpty(userId))
+                    return Unauthorized("Invalid token");
+
+                _logger.LogInformation($"Deleting deployment for project {projectId} on {project.Platform}");
+
+                // Get tokens
+                var githubToken = await ((UnifiedDeploymentService)_deploymentService).GetGitHubTokenForUserAsync(userId);
+
+                string platformToken = null;
+                if (project.Platform != "githubpages")
+                {
+                    platformToken = await _tokenService.GetPlatformTokenAsync(userId, project.Platform, HttpContext);
+                    if (string.IsNullOrEmpty(platformToken))
+                    {
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = $"No {project.Platform} token found. Cannot delete deployment."
+                        });
+                    }
+                }
+
+                // Delete based on platform
+                var deleteResult = project.Platform.ToLower() switch
+                {
+                    "vercel" => await DeleteVercelDeployment(project, platformToken),
+                    "cloudflare" => await DeleteCloudflareDeployment(project, platformToken),
+                    "netlify" => await DeleteNetlifyDeployment(project, platformToken),
+                    "githubpages" => await DeleteGitHubPagesDeployment(project, githubToken),
+                    _ => new DeploymentResponse { Success = false, Message = $"Unsupported platform: {project.Platform}" }
+                };
+
+                if (deleteResult.Success)
+                {
+                    // Remove from tracking
+                    _projects.TryRemove(projectId, out _);
+                    _logger.LogInformation($"✅ Deployment deleted successfully for project {projectId}");
+                }
+
+                return Ok(new
+                {
+                    success = deleteResult.Success,
+                    message = deleteResult.Message,
+                    projectId = projectId,
+                    platform = project.Platform
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, $"Error deleting deployment for project {projectId}");
+                return StatusCode(500, new
+                {
+                    success = false,
+                    message = $"Error deleting deployment: {ex.Message}"
+                });
+            }
+        }
+
+        // ============================================
+        // VERCEL DELETE
+        // ============================================
+        private async Task<DeploymentResponse> DeleteVercelDeployment(ProjectInfo project, string vercelToken)
+        {
+            try
+            {
+                _logger.LogInformation($"Deleting Vercel project: {project.ProjectId}");
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", vercelToken);
+
+                // Extract project ID from deployment (if stored)
+                var vercelProjectId = project.ProjectId; // You might need to store this differently
+
+                // Delete project
+                var deleteUrl = $"https://api.vercel.com/v9/projects/{vercelProjectId}";
+                var response = await client.DeleteAsync(deleteUrl);
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (response.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation($"✅ Vercel project deleted: {vercelProjectId}");
+                    return new DeploymentResponse
+                    {
+                        Success = true,
+                        Message = "Vercel deployment deleted successfully"
+                    };
+                }
+                else
+                {
+                    _logger.LogError($"Failed to delete Vercel project: {body}");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"Failed to delete Vercel deployment: {body}"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting Vercel deployment");
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = $"Error deleting Vercel deployment: {ex.Message}"
+                };
+            }
+        }
+
+        // ============================================
+        // CLOUDFLARE DELETE
+        // ============================================
+        private async Task<DeploymentResponse> DeleteCloudflareDeployment(ProjectInfo project, string cloudflareToken)
+        {
+            try
+            {
+                _logger.LogInformation($"Deleting Cloudflare project: {project.ProjectName}");
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", cloudflareToken);
+
+                // Get account ID
+                var accountResponse = await client.GetAsync("https://api.cloudflare.com/client/v4/accounts");
+                var accountBody = await accountResponse.Content.ReadAsStringAsync();
+
+                if (!accountResponse.IsSuccessStatusCode)
+                {
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"Failed to get Cloudflare account: {accountBody}"
+                    };
+                }
+
+                var accountJson = JsonDocument.Parse(accountBody);
+                var accountId = accountJson.RootElement.GetProperty("result")[0].GetProperty("id").GetString();
+
+                // Extract project name from deployment URL or stored data
+                var projectName = ExtractCloudflareProjectName(project);
+
+                // Delete project
+                var deleteUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects/{projectName}";
+                var deleteResponse = await client.DeleteAsync(deleteUrl);
+                var deleteBody = await deleteResponse.Content.ReadAsStringAsync();
+
+                if (deleteResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation($"✅ Cloudflare project deleted: {projectName}");
+                    return new DeploymentResponse
+                    {
+                        Success = true,
+                        Message = "Cloudflare deployment deleted successfully"
+                    };
+                }
+                else
+                {
+                    _logger.LogError($"Failed to delete Cloudflare project: {deleteBody}");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"Failed to delete Cloudflare deployment: {deleteBody}"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting Cloudflare deployment");
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = $"Error deleting Cloudflare deployment: {ex.Message}"
+                };
+            }
+        }
+
+        // ============================================
+        // NETLIFY DELETE
+        // ============================================
+        private async Task<DeploymentResponse> DeleteNetlifyDeployment(ProjectInfo project, string netlifyToken)
+        {
+            try
+            {
+                _logger.LogInformation($"Deleting Netlify site: {project.ProjectName}");
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", netlifyToken);
+
+                // Extract site ID from deployment URL or stored data
+                var siteId = ExtractNetlifySiteId(project);
+
+                if (string.IsNullOrEmpty(siteId))
+                {
+                    // Try to find site by name
+                    var sitesResponse = await client.GetAsync("https://api.netlify.com/api/v1/sites");
+                    var sitesBody = await sitesResponse.Content.ReadAsStringAsync();
+
+                    if (sitesResponse.IsSuccessStatusCode)
+                    {
+                        var sitesJson = JsonDocument.Parse(sitesBody);
+                        foreach (var site in sitesJson.RootElement.EnumerateArray())
+                        {
+                            var siteName = site.GetProperty("name").GetString();
+                            if (siteName.Contains(project.ProjectName, StringComparison.OrdinalIgnoreCase))
+                            {
+                                siteId = site.GetProperty("id").GetString();
+                                break;
+                            }
+                        }
+                    }
+                }
+
+                if (string.IsNullOrEmpty(siteId))
+                {
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = "Could not find Netlify site ID"
+                    };
+                }
+
+                // Delete site
+                var deleteUrl = $"https://api.netlify.com/api/v1/sites/{siteId}";
+                var deleteResponse = await client.DeleteAsync(deleteUrl);
+
+                if (deleteResponse.IsSuccessStatusCode)
+                {
+                    _logger.LogInformation($"✅ Netlify site deleted: {siteId}");
+                    return new DeploymentResponse
+                    {
+                        Success = true,
+                        Message = "Netlify deployment deleted successfully"
+                    };
+                }
+                else
+                {
+                    var deleteBody = await deleteResponse.Content.ReadAsStringAsync();
+                    _logger.LogError($"Failed to delete Netlify site: {deleteBody}");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"Failed to delete Netlify deployment: {deleteBody}"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error deleting Netlify deployment");
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = $"Error deleting Netlify deployment: {ex.Message}"
+                };
+            }
+        }
+
+        // ============================================
+        // GITHUB PAGES DELETE
+        // ============================================
+        private async Task<DeploymentResponse> DeleteGitHubPagesDeployment(ProjectInfo project, string githubToken)
+        {
+            try
+            {
+                _logger.LogInformation($"Disabling GitHub Pages for: {project.GitHubRepoName}");
+
+                var repoParts = project.GitHubRepoName.Split('/');
+                if (repoParts.Length != 2)
+                {
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = "Invalid repository format"
+                    };
+                }
+
+                var owner = repoParts[0];
+                var repo = repoParts[1];
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", githubToken);
+                client.DefaultRequestHeaders.UserAgent.ParseAdd("SwiftDeploy/1.0");
+                client.DefaultRequestHeaders.Accept.Add(
+                    new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
+                client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
+
+                // Delete GitHub Pages site
+                var deleteUrl = $"https://api.github.com/repos/{owner}/{repo}/pages";
+                var deleteResponse = await client.DeleteAsync(deleteUrl);
+
+                if (deleteResponse.IsSuccessStatusCode || deleteResponse.StatusCode == System.Net.HttpStatusCode.NoContent)
+                {
+                    _logger.LogInformation($"✅ GitHub Pages disabled for: {owner}/{repo}");
+                    return new DeploymentResponse
+                    {
+                        Success = true,
+                        Message = "GitHub Pages deployment disabled successfully"
+                    };
+                }
+                else
+                {
+                    var deleteBody = await deleteResponse.Content.ReadAsStringAsync();
+                    _logger.LogError($"Failed to disable GitHub Pages: {deleteBody}");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"Failed to disable GitHub Pages: {deleteBody}"
+                    };
+                }
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error disabling GitHub Pages");
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = $"Error disabling GitHub Pages: {ex.Message}"
+                };
+            }
+        }
+
+        // ============================================
+        // HELPER METHODS
+        // ============================================
+
+        private string ExtractCloudflareProjectName(ProjectInfo project)
+        {
+            // Try to extract from deployment URL
+            // Format: https://project-name.pages.dev
+            if (!string.IsNullOrEmpty(project.DeploymentUrl))
+            {
+                var uri = new Uri(project.DeploymentUrl);
+                var host = uri.Host;
+                if (host.EndsWith(".pages.dev"))
+                {
+                    return host.Replace(".pages.dev", "");
+                }
+            }
+
+            // Fallback to project name
+            return project.ProjectName?.ToLower().Replace(" ", "-") ?? "unknown";
+        }
+
+        private string ExtractNetlifySiteId(ProjectInfo project)
+        {
+            // Try to extract from deployment URL
+            // Format: https://site-id.netlify.app or https://custom-domain.com
+            if (!string.IsNullOrEmpty(project.DeploymentUrl))
+            {
+                var uri = new Uri(project.DeploymentUrl);
+                var host = uri.Host;
+                if (host.EndsWith(".netlify.app"))
+                {
+                    return host.Replace(".netlify.app", "");
+                }
+            }
+
+            // If ProjectId was stored as Netlify site ID
+            return project.ProjectId;
         }
     } // ← This closes the UnifiedDeploymentController class
 }     // ← This closes the namespace
