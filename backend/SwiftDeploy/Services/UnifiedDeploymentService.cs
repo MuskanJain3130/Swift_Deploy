@@ -479,7 +479,7 @@ namespace SwiftDeploy.Services.Interfaces
                     {
                         type = "github",
                         repo = $"{orgName}/{repoName}",
-                        ref_ = branch
+                        @ref = branch
                     },
                     buildCommand = config.BuildCommand,
                     outputDirectory = config.OutputDirectory,
