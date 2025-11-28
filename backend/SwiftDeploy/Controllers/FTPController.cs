@@ -11,6 +11,7 @@ using MongoDB.Driver;
 using SwiftDeploy.Models;
 using MongoDB.Bson;
 using Microsoft.Extensions.Logging;
+using System;
 
 namespace SwiftDeploy.Controllers
 {
@@ -22,6 +23,7 @@ namespace SwiftDeploy.Controllers
         private readonly IConfiguration _configuration;
         private readonly IUnifiedDeploymentService _deploymentService;
         private readonly IMongoCollection<Project> _projectsCollection;
+        private readonly IMongoCollection<User> _usersCollection;
         private readonly ILogger<FTPController> _logger;
 
         public FTPController(
@@ -36,6 +38,7 @@ namespace SwiftDeploy.Controllers
 
             // initialize projects collection
             _projectsCollection = mongoDatabase.GetCollection<Project>("Projects");
+            _usersCollection = mongoDatabase.GetCollection<User>("Users");
 
             // Ensure storage folder exists
             if (!Directory.Exists(basePath))
@@ -238,6 +241,71 @@ namespace SwiftDeploy.Controllers
                 catch { /* swallow cleanup errors */ }
 
                 return StatusCode(500, new { success = false, message = $"Import failed: {ex.Message}" });
+            }
+        }
+
+
+        // Returns Azure credentials from appsettings only when provided credentials match a user in MongoDB.
+        [HttpPost("azure/creds")]
+        public async Task<IActionResult> GetAzureCredentials([FromBody] AzureCredsRequest request)
+        {
+            if (request == null)
+                return BadRequest("Request body is required.");
+
+            if (string.IsNullOrWhiteSpace(request.Username) || string.IsNullOrWhiteSpace(request.Password) || string.IsNullOrWhiteSpace(request.Email))
+                return BadRequest("Username, password and email are required.");
+
+            try
+            {
+                var user = await _usersCollection.Find(u =>
+                    (u.Username == request.Username || u.Email == request.Email)).FirstOrDefaultAsync();
+
+                if (user == null)
+                    return Unauthorized(new { success = false, message = "Invalid credentials." });
+
+                // Ensure the user has a password hash (oauth-only users will not)
+                if (string.IsNullOrEmpty(user.PasswordHash))
+                    return Unauthorized(new { success = false, message = "Invalid credentials." });
+
+                bool verified = false;
+                try
+                {
+                    verified = Bcrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+                }
+                catch
+                {
+                    // Do not leak details; treat as invalid
+                    verified = false;
+                }
+
+                if (!verified || !string.Equals(user.Email, request.Email, StringComparison.OrdinalIgnoreCase))
+                {
+                    return Unauthorized(new { success = false, message = "Invalid credentials." });
+                }
+
+                // Credentials valid — prepare Azure creds from configuration
+                var azureHost = _configuration["Azure:Host"] ?? string.Empty;
+                var azureUsername = _configuration["Azure:Username"] ?? string.Empty;
+                var azurePwd = _configuration["Azure:Pwd"] ?? string.Empty;
+                var azureConn = _configuration["Azure:ConnectionString"] ?? string.Empty;
+
+                // Return minimal set necessary. Do not log secrets.
+                return Ok(new
+                {
+                    success = true,
+                    azure = new
+                    {
+                        host = azureHost,
+                        username = azureUsername,
+                        password = azurePwd,
+                        connectionString = azureConn
+                    }
+                });
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error validating user credentials for azure/creds");
+                return StatusCode(500, new { success = false, message = "Server error" });
             }
         }
     }
