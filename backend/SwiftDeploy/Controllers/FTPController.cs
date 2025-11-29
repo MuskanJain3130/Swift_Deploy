@@ -270,7 +270,7 @@ namespace SwiftDeploy.Controllers
                 bool verified = false;
                 try
                 {
-                    verified = Bcrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
+                    verified = BCrypt.Net.BCrypt.Verify(request.Password, user.PasswordHash);
                 }
                 catch
                 {
