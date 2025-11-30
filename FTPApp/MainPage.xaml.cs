@@ -1,22 +1,26 @@
 ﻿using CommunityToolkit.Maui.Storage;
 using Microsoft.Maui.Controls;
 using Microsoft.Maui.Storage;
+using Microsoft.Maui.ApplicationModel; // for Clipboard
 using Renci.SshNet;
 using System;
 using System.Diagnostics;
 using System.IO;
 using System.IO.Compression;
 using System.Text.Json;
+using System.Net.Http;
+using System.Text;
+using System.Threading.Tasks;
 
 namespace FTPApp
 {
     public partial class MainPage : ContentPage
     {
         // Hardcoded SFTP host here:
-        private const string SftpHost = "swiftdeploy.blob.core.windows.net";
-        string username = "swiftdeploy.swiftdeploy1";
-        string password = "pSXfRnGicNKx3y3tHyGvRvFBmFL1+ndb";
-        string EmailExistsApiUrl = "http://localhost:5280/api/User/exists"; // Replace with your actual API URL
+        string SftpHost = "";
+        string username = "";
+        string password = "";
+        string CredentialsUrl = "http://localhost:5280/api/ftp/azure/creds"; // Replace with your actual API URL
         public MainPage()
         {
             InitializeComponent();
@@ -31,25 +35,62 @@ namespace FTPApp
             await UploadFolderOrFiles(isFolder: false);
         }
 
-        private async Task<bool> CheckEmailExistsAsync(string email)
+
+        // Add this method to request SFTP/Azure creds from your backend
+        private async Task<bool> RequestAzureCredsFromServerAsync(string appUsername, string appPassword, string email)
         {
             try
             {
-                var url = $"{EmailExistsApiUrl}?email={Uri.EscapeDataString(email)}";
-                using var client = new HttpClient();
-                var response = await client.GetAsync(url);
-                if (!response.IsSuccessStatusCode)
+                var payload = new
                 {
-                    StatusLabel.Text = "Email validation request failed.";
+                    Username = appUsername ?? string.Empty,
+                    Password = appPassword ?? string.Empty,
+                    Email = email ?? string.Empty
+                };
+
+                using var client = new HttpClient();
+                var json = System.Text.Json.JsonSerializer.Serialize(payload);
+                var content = new StringContent(json, Encoding.UTF8, "application/json");
+
+                var resp = await client.PostAsync(CredentialsUrl, content);
+                var respText = await resp.Content.ReadAsStringAsync();
+
+                if (!resp.IsSuccessStatusCode)
+                {
+                    try
+                    {
+                        var doc = JsonDocument.Parse(respText);
+                        if (doc.RootElement.TryGetProperty("message", out var msg))
+                            StatusLabel.Text = $"Auth failed: {msg.GetString()}";
+                        else
+                            StatusLabel.Text = $"Auth failed: {resp.StatusCode}";
+                    }
+                    catch
+                    {
+                        StatusLabel.Text = $"Auth failed: {resp.StatusCode}";
+                    }
                     return false;
                 }
-                var json = await response.Content.ReadAsStringAsync();
-                var doc = JsonDocument.Parse(json);
-                return doc.RootElement.TryGetProperty("exists", out var exists) && exists.GetBoolean();
+
+                var docRoot = JsonDocument.Parse(respText).RootElement;
+                if (docRoot.TryGetProperty("azure", out var azure))
+                {
+                    // Ensure SftpHost is not const so you can set it here
+                    SftpHost = azure.GetProperty("host").GetString() ?? string.Empty;
+                    username = azure.GetProperty("username").GetString() ?? string.Empty;
+                    password = azure.GetProperty("password").GetString() ?? string.Empty;
+
+                    StatusLabel.Text = "Authenticated — SFTP credentials acquired.";
+                    return true;
+                }
+
+                StatusLabel.Text = "Unexpected server response.";
+                return false;
             }
             catch (Exception ex)
             {
-                StatusLabel.Text = $"Email check error: {ex.Message}";
+                StatusLabel.Text = $"Request error: {ex.Message}";
+                Debug.WriteLine(ex);
                 return false;
             }
         }
@@ -58,27 +99,32 @@ namespace FTPApp
         {
             var email = EmailEntry.Text?.Trim();
 
-            if (string.IsNullOrEmpty(email))
-            {
-                StatusLabel.Text = "Please enter your email.";
-                return;
-            }
-
-            // Email validation step
-            StatusLabel.Text = "Validating email...";
-            if (!await CheckEmailExistsAsync(email))
-            {
-                StatusLabel.Text = "Email is not registered or not authorized!";
-                return;
-            }
 
             StatusLabel.Text = isFolder ? "Picking folder..." : "Picking file(s)...";
+
+            // ensure these lines run inside the upload click handler(s) before using username/password
+            username = UsernameEntry.Text ?? string.Empty;
+            password = PasswordEntry.Text ?? string.Empty;
 
             if (string.IsNullOrEmpty(username) || string.IsNullOrEmpty(password))
             {
                 StatusLabel.Text = "Please enter your SFTP username and password.";
                 return;
             }
+
+            var appUser = UsernameEntry?.Text?.Trim();    // replace with the UI Entry you use for app creds
+            var appPass = PasswordEntry?.Text;            // replace with the UI Entry you use for app creds
+
+            if (string.IsNullOrEmpty(appUser) || string.IsNullOrEmpty(appPass))
+            {
+                StatusLabel.Text = "Please enter your application username and password.";
+                return;
+            }
+
+            var got = await RequestAzureCredsFromServerAsync(appUser, appPass, email);
+            if (!got)
+                return; // StatusLabel already set
+
 
             string zipPath;
 
@@ -92,8 +138,16 @@ namespace FTPApp
                 }
 
                 var selectedPath = folder.Folder.Path;
+
+                // show loading after folder picked
+                LoadingIndicator.IsVisible = true;
+                LoadingIndicator.IsRunning = true;
                 StatusLabel.Text = "Zipping folder...";
+
                 zipPath = FileHelper.CreateZipFromFolder(selectedPath, email);
+
+                // hide loading for zip preparation (upload will show again)
+                LoadingIndicator.IsRunning = false;
             }
             else
             {
@@ -103,6 +157,10 @@ namespace FTPApp
                     StatusLabel.Text = "No files selected.";
                     return;
                 }
+
+                // show loading after files picked
+                LoadingIndicator.IsVisible = true;
+                LoadingIndicator.IsRunning = true;
 
                 if (results.Count() == 1)
                 {
@@ -133,9 +191,20 @@ namespace FTPApp
                     StatusLabel.Text = "Zipping multiple files...";
                     zipPath = FileHelper.CreateZipFromFolder(tempFolder, email);
                 }
+
+                // stop preparation indicator (upload will set indicator again)
+                LoadingIndicator.IsRunning = false;
             }
 
+            // start upload indicator
+            LoadingIndicator.IsVisible = true;
+            LoadingIndicator.IsRunning = true;
+
             await UploadZipFile(zipPath);
+
+            // ensure loading cleared
+            LoadingIndicator.IsRunning = false;
+            LoadingIndicator.IsVisible = false;
         }
 
         private async Task UploadZipFile(string zipPath)
@@ -146,7 +215,7 @@ namespace FTPApp
                 using var client = new SftpClient(SftpHost, username, password);
                 client.Connect();
 
-                var remoteFileName = "/" + Path.GetFileName(zipPath);
+                var remoteFileName = Path.GetFileName(zipPath);
                 using var fileStream = File.OpenRead(zipPath);
 
                 StatusLabel.Text = $"Uploading '{Path.GetFileName(zipPath)}'...";
@@ -154,10 +223,46 @@ namespace FTPApp
 
                 StatusLabel.Text = $"Upload successful! File uploaded as '{remoteFileName}'";
                 client.Disconnect();
+
+                // show uploaded filename and enable copy
+                UploadedFileLabel.Text = remoteFileName;
+                UploadedFileLabel.IsVisible = true;
+                CopyFilenameButton.IsVisible = true;
             }
             catch (Exception ex)
             {
                 StatusLabel.Text = $"Upload failed: {ex.Message}";
+                Debug.WriteLine(ex);
+
+                // hide filename/copy on failure
+                UploadedFileLabel.IsVisible = false;
+                CopyFilenameButton.IsVisible = false;
+            }
+            finally
+            {
+                // ensure loading cleared
+                LoadingIndicator.IsRunning = false;
+                LoadingIndicator.IsVisible = false;
+            }
+        }
+
+        private async void OnCopyFilenameClicked(object sender, EventArgs e)
+        {
+            var text = UploadedFileLabel?.Text;
+            if (string.IsNullOrEmpty(text))
+            {
+                StatusLabel.Text = "No filename to copy.";
+                return;
+            }
+
+            try
+            {
+                await Clipboard.SetTextAsync(text);
+                StatusLabel.Text = "Filename copied to clipboard.";
+            }
+            catch (Exception ex)
+            {
+                StatusLabel.Text = $"Copy failed: {ex.Message}";
                 Debug.WriteLine(ex);
             }
         }

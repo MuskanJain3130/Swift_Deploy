@@ -19,14 +19,29 @@
         <!-- User Email Entry -->
         <Entry x:Name="EmailEntry" Placeholder="Enter your email" Keyboard="Email" />
 
+        <!-- Username Entry (app username or SFTP username per your flow) -->
+        <Entry x:Name="UsernameEntry" Placeholder="Enter your username" />
+
+        <!-- Password Entry -->
+        <Entry x:Name="PasswordEntry" Placeholder="Enter your password" IsPassword="True" />
+
         <!-- Buttons -->
         <HorizontalStackLayout Spacing="25" HorizontalOptions="Center">
             <Button Text="Upload Folder" Clicked="OnUploadFolderClicked"/>
             <Button Text="Upload File(s)" Clicked="OnUploadFilesClicked"/>
         </HorizontalStackLayout>
 
-        <!-- Status Label -->
-        <Label x:Name="StatusLabel" Text="Status will appear here" />
+        <!-- Loading indicator (shown while preparing/uploading) -->
+        <HorizontalStackLayout VerticalOptions="Center" HorizontalOptions="Center" Spacing="10">
+            <ActivityIndicator x:Name="LoadingIndicator" IsVisible="False" IsRunning="False" WidthRequest="24" HeightRequest="24" />
+            <Label x:Name="StatusLabel" Text="Status will appear here" VerticalOptions="Center" />
+        </HorizontalStackLayout>
 
-    </VerticalStackLayout>
+        <!-- Uploaded filename and copy button (hidden until upload succeeds) -->
+        <HorizontalStackLayout Spacing="10" HorizontalOptions="Center" IsVisible="True">
+            <Label x:Name="UploadedFileLabel" Text="" IsVisible="False" VerticalOptions="Center" />
+            <Button x:Name="CopyFilenameButton" Text="Copy filename" IsVisible="False" Clicked="OnCopyFilenameClicked"/>
+        </HorizontalStackLayout>
+
+         </VerticalStackLayout>
 </ContentPage>
