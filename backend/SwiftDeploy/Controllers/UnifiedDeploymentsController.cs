@@ -226,25 +226,27 @@ namespace SwiftDeploy.Controllers
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
-                // ⭐ Add GitHub Pages to supported platforms
                 var supportedPlatforms = new[] { "vercel", "cloudflare", "netlify", "githubpages" };
                 if (!supportedPlatforms.Contains(request.Platform.ToLower()))
                     return BadRequest($"Unsupported platform: {request.Platform}");
 
-                // ⭐ Get GitHub token from service (checks header then database)
+                // Get GitHub token from database
                 var githubToken = await ((UnifiedDeploymentService)_deploymentService).GetGitHubTokenForUserAsync(request.UserId);
+
                 if (string.IsNullOrEmpty(githubToken))
                 {
                     return BadRequest(new
                     {
                         success = false,
-                        message = "GitHub token not found. Please connect your GitHub account first.",
+                        message = "GitHub token not found in database. Please connect your GitHub account first.",
                         platform = "github",
                         userId = request.UserId
                     });
                 }
 
-                // ⭐ Get platform token (skip for GitHub Pages)
+                _logger.LogInformation($"✅ GitHub token retrieved from database (length: {githubToken.Length})");
+
+                // Get platform token (skip for GitHub Pages)
                 string platformToken = null;
                 if (request.Platform.ToLower() != "githubpages")
                 {
@@ -278,7 +280,7 @@ namespace SwiftDeploy.Controllers
 
                 _logger.LogInformation($"Starting GitHub deployment for {request.GitHubRepo} on {request.Platform}");
 
-                // ⭐ Step 1: Generate and save config (skip for GitHub Pages)
+                // Step 1: Generate and save config (skip for GitHub Pages)
                 string configFileUrl = null;
 
                 if (request.Platform.ToLower() != "githubpages")
@@ -299,13 +301,13 @@ namespace SwiftDeploy.Controllers
                         await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed,
                             $"Failed to save config: {configResult.Message}");
 
-                        return BadRequest(new DeploymentResponse
+                        return BadRequest(new
                         {
-                            Success = false,
-                            Message = $"Failed to save config to GitHub: {configResult.Message}",
-                            ProjectId = projectId,
-                            GitHubRepoUrl = projectInfo.GitHubRepoUrl,
-                            Status = DeploymentStatus.Failed
+                            success = false,
+                            message = $"Failed to save config to GitHub: {configResult.Message}",
+                            projectId = projectId,
+                            gitHubRepoUrl = projectInfo.GitHubRepoUrl,
+                            status = (int)DeploymentStatus.Failed
                         });
                     }
 
@@ -314,11 +316,10 @@ namespace SwiftDeploy.Controllers
                 }
                 else
                 {
-                    // ⭐ GitHub Pages doesn't need config file
                     _logger.LogInformation("Skipping config generation for GitHub Pages");
                 }
 
-                // ⭐ Step 2: Deploy to platform
+                // Step 2: Deploy to platform
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Deploying, $"Deploying to {request.Platform}...");
 
                 DeploymentResponse deploymentResult = request.Platform.ToLower() switch
@@ -337,6 +338,20 @@ namespace SwiftDeploy.Controllers
                     projectInfo.Status = DeploymentStatus.Completed;
 
                     _logger.LogInformation($"✅ Deployment completed: {deploymentResult.DeploymentUrl}");
+
+                    // ⭐ Return consistent response format
+                    return Ok(new
+                    {
+                        success = true,
+                        message = deploymentResult.Message,
+                        projectId = projectId,
+                        gitHubRepoUrl = projectInfo.GitHubRepoUrl,
+                        deploymentUrl = deploymentResult.DeploymentUrl,
+                        configFileUrl = configFileUrl,
+                        status = (int)DeploymentStatus.Completed,
+                        progress = 100,
+                        currentStep = "Completed"
+                    });
                 }
                 else
                 {
@@ -344,30 +359,28 @@ namespace SwiftDeploy.Controllers
                     projectInfo.Status = DeploymentStatus.Failed;
 
                     _logger.LogError($"❌ Deployment failed: {deploymentResult.Message}");
-                }
 
-                return Ok(new DeploymentResponse
-                {
-                    Success = deploymentResult.Success,
-                    Message = deploymentResult.Message,
-                    ProjectId = projectId,
-                    GitHubRepoUrl = projectInfo.GitHubRepoUrl,
-                    DeploymentUrl = deploymentResult.DeploymentUrl,
-                    ConfigFileUrl = configFileUrl,  // ⭐ Will be null for GitHub Pages
-                    Status = projectInfo.Status
-                });
+                    return BadRequest(new
+                    {
+                        success = false,
+                        message = deploymentResult.Message,
+                        projectId = projectId,
+                        gitHubRepoUrl = projectInfo.GitHubRepoUrl,
+                        status = (int)DeploymentStatus.Failed
+                    });
+                }
             }
             catch (Exception ex)
             {
                 _logger.LogError(ex, $"GitHub deployment failed for {request.GitHubRepo}");
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, ex.Message);
 
-                return StatusCode(500, new DeploymentResponse
+                return StatusCode(500, new
                 {
-                    Success = false,
-                    Message = $"Deployment failed: {ex.Message}",
-                    ProjectId = projectId,
-                    Status = DeploymentStatus.Failed
+                    success = false,
+                    message = $"Deployment failed: {ex.Message}",
+                    projectId = projectId,
+                    status = (int)DeploymentStatus.Failed
                 });
             }
         }
