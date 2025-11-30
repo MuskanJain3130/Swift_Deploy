@@ -4,6 +4,7 @@ using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
 using SwiftDeploy.Models;
 using System.Net.Http.Headers;
+using System.Security.Claims;
 
 namespace SwiftDeploy.Controllers
 {
@@ -28,16 +29,22 @@ namespace SwiftDeploy.Controllers
                 if (body == null)
                     return BadRequest("Deployment data is required");
 
-                var deployment = new Deployment
-                {
-                    RepoId = body.ContainsKey("repoId") ? body["repoId"].ToString() : null,
-                    ServiceId = body.ContainsKey("serviceId") ? body["serviceId"].ToString() : null,
-                    ServiceUrl = body.ContainsKey("serviceUrl") ? body["serviceUrl"].ToString() : null,
-                    Status = "queued", // default
-                    DeployedAt = DateTime.UtcNow
-                };
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
-                _deployments.InsertOne(deployment);
+            var deployment = new Deployment
+            {
+                UserId = body.ContainsKey("userId") ? body["userId"].ToString() : userId,
+                Platform = body.ContainsKey("platform") ? body["platform"].ToString() : null,
+                RepoId = body.ContainsKey("repoId") ? body["repoId"].ToString() : null,
+                GitHubRepoUrl = body.ContainsKey("gitHubRepoUrl") ? body["gitHubRepoUrl"].ToString() : null,
+                ServiceId = body.ContainsKey("serviceId") ? body["serviceId"].ToString() : null,
+                ServiceUrl = body.ContainsKey("serviceUrl") ? body["serviceUrl"].ToString() : null,
+                ConfigFileUrl = body.ContainsKey("configFileUrl") ? body["configFileUrl"].ToString() : null,
+                Status = "queued",
+                DeployedAt = DateTime.UtcNow
+            };
+
+            _deployments.InsertOne(deployment);
 
                 return CreatedAtAction(nameof(GetDeploymentById), new { id = deployment.Id }, deployment);
             }
@@ -65,13 +72,9 @@ namespace SwiftDeploy.Controllers
         [HttpGet("user/{id}")]
         public IActionResult GetDeploymentByUserId(string id)
         {
-            List<Deployment> deployments = new();
-            var userrepos = _projects.Find(d => d.UserId == id).ToList();
-            foreach (var repo in userrepos)
-            {
-                var deployment = _deployments.Find(d => d.RepoId == repo.RepoId).ToList();
-                deployments.AddRange(deployment);
-            }
+            var deployments 
+             = _deployments.Find(d => d.UserId == id).ToList();
+            
             return Ok(deployments);
 
         }
@@ -79,9 +82,8 @@ namespace SwiftDeploy.Controllers
         [HttpGet("{id}")]
         public IActionResult GetDeploymentById(string id)
         {
-            var deployments = _projects.Find(d => d.Id == id).FirstOrDefault();
+            var deployments = _deployments.Find(d => d.Id == id).FirstOrDefault();
             return Ok(deployments);
-
         }
 
         [HttpPut("{id}/status")]
@@ -99,11 +101,11 @@ namespace SwiftDeploy.Controllers
             {   
                 var result = _deployments.DeleteOne(d => d.Id == id);
 
-                if (result.DeletedCount == 0)
-                    return NotFound();
+            if (result.DeletedCount == 0)
+                return NotFound();
 
-                return NoContent();
-            }
+            return NoContent();
         }
     }
+}
 
