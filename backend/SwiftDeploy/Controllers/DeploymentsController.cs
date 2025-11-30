@@ -86,6 +86,13 @@ namespace SwiftDeploy.Controllers
             return Ok(deployments);
         }
 
+        [HttpPost("latest")]
+        public IActionResult GetLatestDeploymentById(string repoId)
+        {
+            var deployments = _deployments.Find(d => d.RepoId == repoId).SortByDescending(d=>d.DeployedAt).FirstOrDefault();
+            return Ok(deployments);
+        }
+
         [HttpPut("{id}/status")]
             public IActionResult UpdateDeploymentStatus(string id, [FromBody] string status)
             {
