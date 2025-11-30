@@ -12,12 +12,15 @@ namespace SwiftDeploy.Controllers
     [Authorize]
     public class DeploymentsController : ControllerBase
     {
-            private readonly IMongoCollection<Deployment> _deployments;
+        private readonly IMongoCollection<Deployment> _deployments;
+        private readonly IMongoCollection<Project> _projects;
 
-            public DeploymentsController(IMongoDatabase mongoDatabase)
+        public DeploymentsController(IMongoDatabase mongoDatabase)
             {
-                _deployments = mongoDatabase.GetCollection<Deployment>("Deployments");
-            }
+            _deployments = mongoDatabase.GetCollection<Deployment>("Deployments");
+            _projects = mongoDatabase.GetCollection<Project>("Projects");
+           }
+            
     
             [HttpPost]
             public IActionResult CreateDeployment([FromBody] Dictionary<string, object> body)
@@ -38,25 +41,50 @@ namespace SwiftDeploy.Controllers
 
                 return CreatedAtAction(nameof(GetDeploymentById), new { id = deployment.Id }, deployment);
             }
-
-            [HttpGet]
-            public IActionResult GetAllDeployments()
+            [HttpPost("repo")]
+            public IActionResult GetDeploymentByUserId([FromBody] Dictionary<string, string> request)
             {
-                var list = _deployments.Find(_ => true).ToList();
-                return Ok(list);
-            }
+                if (request == null || !request.TryGetValue("repoId", out var repoId))
+                    return BadRequest("repoId is required in the request body");
 
-            [HttpGet("{id}")]
-            public IActionResult GetDeploymentById(string id)
-            {
-                var deployment = _deployments.Find(d => d.Id == id).FirstOrDefault();
+                var deployment = _deployments.Find(d => d.RepoId == repoId).FirstOrDefault();
                 if (deployment == null)
                     return NotFound();
 
                 return Ok(deployment);
             }
 
-            [HttpPut("{id}/status")]
+
+        //[HttpGet]
+        // public IActionResult GetAllDeployments()
+        // {
+        //     var list = _deployments.Find(_ => true).ToList();
+        //     return Ok(list);
+        // }
+
+        [HttpGet("user/{id}")]
+        public IActionResult GetDeploymentByUserId(string id)
+        {
+            List<Deployment> deployments = new();
+            var userrepos = _projects.Find(d => d.UserId == id).ToList();
+            foreach (var repo in userrepos)
+            {
+                var deployment = _deployments.Find(d => d.RepoId == repo.RepoId).ToList();
+                deployments.AddRange(deployment);
+            }
+            return Ok(deployments);
+
+        }
+
+        [HttpGet("{id}")]
+        public IActionResult GetDeploymentById(string id)
+        {
+            var deployments = _projects.Find(d => d.Id == id).FirstOrDefault();
+            return Ok(deployments);
+
+        }
+
+        [HttpPut("{id}/status")]
             public IActionResult UpdateDeploymentStatus(string id, [FromBody] string status)
             {
                 var update = Builders<Deployment>.Update.Set(d => d.Status, status);
@@ -66,7 +94,7 @@ namespace SwiftDeploy.Controllers
                 return NoContent();
             }
 
-        [HttpDelete("{id}")]
+            [HttpDelete("{id}")]
             public IActionResult DeleteDeployment(string id)
             {   
                 var result = _deployments.DeleteOne(d => d.Id == id);
