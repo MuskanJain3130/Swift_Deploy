@@ -1,6 +1,7 @@
 ﻿// Controllers/UnifiedDeploymentController.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Driver;
 using Octokit;
 using SwiftDeploy.Models;
 using SwiftDeploy.Services;
@@ -9,6 +10,7 @@ using System.Collections.Concurrent;
 using System.Security.Claims;
 using System.Text;
 using System.Text.Json;
+using Deployment = SwiftDeploy.Models.Deployment;
 using DeploymentStatus = SwiftDeploy.Models.DeploymentStatus;
 namespace SwiftDeploy.Controllers
 {
@@ -22,10 +24,9 @@ namespace SwiftDeploy.Controllers
         private readonly ILogger<UnifiedDeploymentController> _logger;
         private static readonly ConcurrentDictionary<string, ProjectInfo> _projects = new();
         private readonly IConfiguration _configuration;
-        IHttpContextAccessor _httpContextAccessor; // ADD THIS
-
-        // Remove this line:
+        private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly TokenService _tokenService;
+        private readonly IMongoCollection<Deployment> _deploymentsCollection;
 
         public UnifiedDeploymentController(
             IUnifiedDeploymentService deploymentService,
@@ -33,8 +34,8 @@ namespace SwiftDeploy.Controllers
             IConfiguration configuration,
             TokenService tokenService,
             ILogger<UnifiedDeploymentController> logger,
-                IHttpContextAccessor httpContextAccessor // ADD THIS
-)
+            IHttpContextAccessor httpContextAccessor,
+            IMongoDatabase mongoDatabase)
         {
             _deploymentService = deploymentService;
             _templateEngine = templateEngine;
@@ -42,6 +43,7 @@ namespace SwiftDeploy.Controllers
             _tokenService = tokenService;
             _logger = logger;
             _httpContextAccessor = httpContextAccessor;
+            _deploymentsCollection = mongoDatabase.GetCollection<Deployment>("Deployments");
         }
 
         [HttpPost("deploy-without-github")]
@@ -49,6 +51,7 @@ namespace SwiftDeploy.Controllers
         public async Task<IActionResult> DeployWithoutGitHub([FromForm] UploadProjectRequest request)
         {
             var projectId = Guid.NewGuid().ToString();
+            var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
 
             try
             {
@@ -56,7 +59,7 @@ namespace SwiftDeploy.Controllers
                 if (!ModelState.IsValid)
                     return BadRequest(ModelState);
 
-                var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                
                 if (string.IsNullOrEmpty(userId))
                     return Unauthorized("Invalid token");
 
@@ -116,11 +119,38 @@ namespace SwiftDeploy.Controllers
                     await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Completed, "Deployment completed successfully!");
                     projectInfo.DeploymentUrl = deploymentResult.DeploymentUrl;
                     projectInfo.Status = DeploymentStatus.Completed;
+
+                    // ⭐ Save successful deployment to MongoDB
+                    var mongoDeployment = new Deployment
+                    {
+                        UserId = userId,
+                        Platform = request.Platform.ToLower(),
+                        RepoId = projectInfo.GitHubRepoName,
+                        GitHubRepoUrl = projectInfo.GitHubRepoUrl,
+                        Status = "completed",
+                        ServiceUrl = deploymentResult.DeploymentUrl,
+                        ConfigFileUrl = deploymentResult.ConfigFileUrl,
+                        DeployedAt = DateTime.UtcNow
+                    };
+                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
+                    _logger.LogInformation($"✅ Deployment saved to MongoDB: {mongoDeployment.Id}");
                 }
                 else
                 {
                     await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, deploymentResult.Message);
                     projectInfo.Status = DeploymentStatus.Failed;
+
+                    // ⭐ Save failed deployment to MongoDB
+                    var mongoDeployment = new Deployment
+                    {
+                        UserId = userId,
+                        Platform = request.Platform.ToLower(),
+                        RepoId = projectInfo.GitHubRepoName,
+                        GitHubRepoUrl = projectInfo.GitHubRepoUrl,
+                        Status = "failed",
+                        DeployedAt = DateTime.UtcNow
+                    };
+                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
                 }
 
                 return Ok(new DeploymentResponse
@@ -138,6 +168,20 @@ namespace SwiftDeploy.Controllers
             {
                 _logger.LogError(ex, $"Deployment failed for project {request.ProjectName}");
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, ex.Message);
+
+                // ⭐ Save error deployment to MongoDB
+                try
+                {
+                    var mongoDeployment = new Deployment
+                    {
+                        UserId = userId,
+                        Platform = request.Platform.ToLower(),
+                        Status = "failed",
+                        DeployedAt = DateTime.UtcNow
+                    };
+                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
+                }
+                catch { /* Ignore MongoDB errors in catch block */ }
 
                 return StatusCode(500, new DeploymentResponse
                 {
@@ -343,12 +387,28 @@ namespace SwiftDeploy.Controllers
 
                     _logger.LogInformation($"✅ Deployment completed: {deploymentResult.DeploymentUrl}");
 
+                    // ⭐ Save deployment to MongoDB
+                    var mongoDeployment = new Deployment
+                    {
+                        UserId = request.UserId,
+                        Platform = request.Platform.ToLower(),
+                        RepoId = request.GitHubRepo,
+                        GitHubRepoUrl = projectInfo.GitHubRepoUrl,
+                        Status = "completed",
+                        ServiceUrl = deploymentResult.DeploymentUrl,
+                        ConfigFileUrl = configFileUrl,
+                        DeployedAt = DateTime.UtcNow
+                    };
+                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
+                    _logger.LogInformation($"✅ Deployment saved to MongoDB: {mongoDeployment.Id}");
+
                     // ⭐ Return consistent response format
                     return Ok(new
                     {
                         success = true,
                         message = deploymentResult.Message,
                         projectId = projectId,
+                        deploymentId = mongoDeployment.Id,
                         gitHubRepoUrl = projectInfo.GitHubRepoUrl,
                         deploymentUrl = deploymentResult.DeploymentUrl,
                         configFileUrl = configFileUrl,
@@ -364,11 +424,24 @@ namespace SwiftDeploy.Controllers
 
                     _logger.LogError($"❌ Deployment failed: {deploymentResult.Message}");
 
+                    // ⭐ Save failed deployment to MongoDB
+                    var mongoDeployment = new Deployment
+                    {
+                        UserId = request.UserId,
+                        Platform = request.Platform.ToLower(),
+                        RepoId = request.GitHubRepo,
+                        GitHubRepoUrl = projectInfo.GitHubRepoUrl,
+                        Status = "failed",
+                        DeployedAt = DateTime.UtcNow
+                    };
+                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
+
                     return BadRequest(new
                     {
                         success = false,
                         message = deploymentResult.Message,
                         projectId = projectId,
+                        deploymentId = mongoDeployment.Id,
                         gitHubRepoUrl = projectInfo.GitHubRepoUrl,
                         status = (int)DeploymentStatus.Failed
                     });
@@ -378,6 +451,21 @@ namespace SwiftDeploy.Controllers
             {
                 _logger.LogError(ex, $"GitHub deployment failed for {request.GitHubRepo}");
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, ex.Message);
+
+                // ⭐ Save error deployment to MongoDB
+                try
+                {
+                    var mongoDeployment = new Deployment
+                    {
+                        UserId = request.UserId,
+                        Platform = request.Platform.ToLower(),
+                        RepoId = request.GitHubRepo,
+                        Status = "failed",
+                        DeployedAt = DateTime.UtcNow
+                    };
+                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
+                }
+                catch { /* Ignore MongoDB errors in catch block */ }
 
                 return StatusCode(500, new
                 {
