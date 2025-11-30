@@ -148,6 +148,10 @@ namespace SwiftDeploy.Controllers
                 });
             }
         }
+
+
+
+
         [HttpGet("status/{projectId}")]
         public async Task<IActionResult> GetDeploymentStatus(string projectId)
         {

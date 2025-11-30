@@ -82,6 +82,8 @@ namespace SwiftDeploy.Controllers
             return File(memory, "application/octet-stream", Path.GetFileName(fullPath));
         }
 
+        
+        
         // List files in directory (simulates FTP LIST)
         [HttpGet("list")]
         public IActionResult ListFiles(string directory = "")
