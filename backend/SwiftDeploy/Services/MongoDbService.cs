@@ -20,8 +20,7 @@ namespace SwiftDeploy.Services
         public IMongoCollection<User> Users => _database.GetCollection<User>("Users");
         public IMongoCollection<UserTokens> UserTokens => _database.GetCollection<UserTokens>("UserTokens");
         public IMongoCollection<Deployment> Deployments => _database.GetCollection<Deployment>("Deployments");
-        public IMongoCollection<Deployment> Projects => _database.GetCollection<Deployment>("Projects");
-
+        public IMongoCollection<Project> Projects => _database.GetCollection<Project>("Projects");
         public IMongoCollection<Repository> Repositories => _database.GetCollection<Repository>("Repositories");
        public IMongoCollection<Models.LogEntry> Logs => _database.GetCollection<Models.LogEntry>("Logs");
 
