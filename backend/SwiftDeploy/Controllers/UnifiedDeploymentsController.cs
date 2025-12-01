@@ -476,263 +476,154 @@ namespace SwiftDeploy.Controllers
                 });
             }
         }
-        [HttpGet("projects")]
-        public async Task<IActionResult> GetUserProjects([FromQuery] string userId = null)
-        {
-            try
-            {
-                // If no userId provided, return all projects (for admin/testing)
-                // In production, you'd get userId from authentication context
-                var userProjects = _projects.Values
-                    .Where(p => userId == null || p.ProjectId.Contains(userId)) // Simple filter for demo
-                    .OrderByDescending(p => p.CreatedAt)
-                    .Select(p => new
-                    {
-                        p.ProjectId,
-                        p.ProjectName,
-                        p.Description,
-                        p.Platform,
-                        p.Status,
-                        p.CreatedAt,
-                        p.GitHubRepoUrl,
-                        p.DeploymentUrl,
-                        StatusMessage = GetStatusMessage(p.Status),
-                        Progress = GetProgressPercentage(p.Status)
-                    })
-                    .ToList();
+        //[HttpGet("projects")]
+        //public async Task<IActionResult> GetUserProjects([FromQuery] string userId = null)
+        //{
+        //    try
+        //    {
+        //        // If no userId provided, return all projects (for admin/testing)
+        //        // In production, you'd get userId from authentication context
+        //        var userProjects = _projects.Values
+        //            .Where(p => userId == null || p.ProjectId.Contains(userId)) // Simple filter for demo
+        //            .OrderByDescending(p => p.CreatedAt)
+        //            .Select(p => new
+        //            {
+        //                p.ProjectId,
+        //                p.ProjectName,
+        //                p.Description,
+        //                p.Platform,
+        //                p.Status,
+        //                p.CreatedAt,
+        //                p.GitHubRepoUrl,
+        //                p.DeploymentUrl,
+        //                StatusMessage = GetStatusMessage(p.Status),
+        //                Progress = GetProgressPercentage(p.Status)
+        //            })
+        //            .ToList();
 
-                return Ok(new
-                {
-                    projects = userProjects,
-                    total = userProjects.Count
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Error retrieving user projects");
-                return StatusCode(500, "Error retrieving projects");
-            }
-        }
+        //        return Ok(new
+        //        {
+        //            projects = userProjects,
+        //            total = userProjects.Count
+        //        });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError(ex, "Error retrieving user projects");
+        //        return StatusCode(500, "Error retrieving projects");
+        //    }
+        //}
 
-        [HttpGet("projects/{projectId}")]
-        public async Task<IActionResult> GetProjectDetails(string projectId)
-        {
-            try
-            {
-                if (!_projects.TryGetValue(projectId, out var project))
-                    return NotFound("Project not found");
+        //[HttpGet("projects/{projectId}")]
+        //public async Task<IActionResult> GetProjectDetails(string projectId)
+        //{
+        //    try
+        //    {
+        //        if (!_projects.TryGetValue(projectId, out var project))
+        //            return NotFound("Project not found");
 
-                return Ok(new
-                {
-                    project.ProjectId,
-                    project.ProjectName,
-                    project.Description,
-                    project.Platform,
-                    project.Status,
-                    project.CreatedAt,
-                    project.GitHubRepoName,
-                    project.GitHubRepoUrl,
-                    project.DeploymentUrl,
-                    project.Config,
-                    StatusMessage = GetStatusMessage(project.Status),
-                    Progress = GetProgressPercentage(project.Status),
-                    CurrentStep = GetCurrentStep(project.Status)
-                });
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, $"Error retrieving project details for {projectId}");
-                return StatusCode(500, "Error retrieving project details");
-            }
-        }// Helper function for Cloudflare deployment
-        private async Task<DeploymentResponse> DeployToCloudflareWithConfig(string repoPath, string branch, CommonConfig config)
-        {
-            try
-            {
-                var swiftDeployToken = _configuration["SwiftDeploy:CloudflareToken"];
-                if (string.IsNullOrEmpty(swiftDeployToken))
-                    throw new Exception("SwiftDeploy Cloudflare token not configured");
+        //        return Ok(new
+        //        {
+        //            project.ProjectId,
+        //            project.ProjectName,
+        //            project.Description,
+        //            project.Platform,
+        //            project.Status,
+        //            project.CreatedAt,
+        //            project.GitHubRepoName,
+        //            project.GitHubRepoUrl,
+        //            project.DeploymentUrl,
+        //            project.Config,
+        //            StatusMessage = GetStatusMessage(project.Status),
+        //            Progress = GetProgressPercentage(project.Status),
+        //            CurrentStep = GetCurrentStep(project.Status)
+        //        });
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        _logger.LogError(ex, $"Error retrieving project details for {projectId}");
+        //        return StatusCode(500, "Error retrieving project details");
+        //    }
+        //}// Helper function for Cloudflare deployment
+        //private async Task<DeploymentResponse> DeployToCloudflareWithConfig(string repoPath, string branch, CommonConfig config)
+        //{
+        //    try
+        //    {
+        //        var swiftDeployToken = _configuration["SwiftDeploy:CloudflareToken"];
+        //        if (string.IsNullOrEmpty(swiftDeployToken))
+        //            throw new Exception("SwiftDeploy Cloudflare token not configured");
 
-                using var client = new HttpClient();
-                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", swiftDeployToken);
+        //        using var client = new HttpClient();
+        //        client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", swiftDeployToken);
 
-                // Get account ID
-                var userResponse = await client.GetAsync("https://api.cloudflare.com/client/v4/accounts");
-                var userString = await userResponse.Content.ReadAsStringAsync();
-                if (!userResponse.IsSuccessStatusCode)
-                    throw new Exception($"Failed to get Cloudflare account: {userString}");
+        //        // Get account ID
+        //        var userResponse = await client.GetAsync("https://api.cloudflare.com/client/v4/accounts");
+        //        var userString = await userResponse.Content.ReadAsStringAsync();
+        //        if (!userResponse.IsSuccessStatusCode)
+        //            throw new Exception($"Failed to get Cloudflare account: {userString}");
 
-                var userJson = JsonDocument.Parse(userString);
-                string accountId = userJson.RootElement.GetProperty("result")[0].GetProperty("id").GetString();
+        //        var userJson = JsonDocument.Parse(userString);
+        //        string accountId = userJson.RootElement.GetProperty("result")[0].GetProperty("id").GetString();
 
-                // Generate project name
-                string projectName = GenerateCloudflareProjectName(repoPath, branch);
+        //        // Generate project name
+        //        string projectName = GenerateCloudflareProjectName(repoPath, branch);
 
-                // Create project
-                var createProjectUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects";
-                var createPayload = new
-                {
-                    name = projectName,
-                    production_branch = branch,
-                    source = new
-                    {
-                        type = "github",
-                        config = new
-                        {
-                            git_provider = "github",
-                            owner = "swiftdeploy-repos", // Your organization
-                            repo_name = repoPath.Split('/').Last(),
-                            branch = branch
-                        }
-                    },
-                    build_config = new
-                    {
-                        build_command = config.BuildCommand,
-                        destination_dir = config.OutputDirectory,
-                        root_dir = ""
-                    }
-                };
+        //        // Create project
+        //        var createProjectUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects";
+        //        var createPayload = new
+        //        {
+        //            name = projectName,
+        //            production_branch = branch,
+        //            source = new
+        //            {
+        //                type = "github",
+        //                config = new
+        //                {
+        //                    git_provider = "github",
+        //                    owner = "swiftdeploy-repos", // Your organization
+        //                    repo_name = repoPath.Split('/').Last(),
+        //                    branch = branch
+        //                }
+        //            },
+        //            build_config = new
+        //            {
+        //                build_command = config.BuildCommand,
+        //                destination_dir = config.OutputDirectory,
+        //                root_dir = ""
+        //            }
+        //        };
 
-                var createContent = new StringContent(JsonSerializer.Serialize(createPayload), System.Text.Encoding.UTF8, "application/json");
-                var createResponse = await client.PostAsync(createProjectUrl, createContent);
-                var createResult = await createResponse.Content.ReadAsStringAsync();
+        //        var createContent = new StringContent(JsonSerializer.Serialize(createPayload), System.Text.Encoding.UTF8, "application/json");
+        //        var createResponse = await client.PostAsync(createProjectUrl, createContent);
+        //        var createResult = await createResponse.Content.ReadAsStringAsync();
 
-                if (!createResponse.IsSuccessStatusCode)
-                    throw new Exception($"Cloudflare project creation failed: {createResult}");
+        //        if (!createResponse.IsSuccessStatusCode)
+        //            throw new Exception($"Cloudflare project creation failed: {createResult}");
 
-                var createData = JsonDocument.Parse(createResult);
-                var deploymentUrl = createData.RootElement.GetProperty("result").GetProperty("subdomain").GetString() + ".pages.dev";
+        //        var createData = JsonDocument.Parse(createResult);
+        //        var deploymentUrl = createData.RootElement.GetProperty("result").GetProperty("subdomain").GetString() + ".pages.dev";
 
-                // Trigger deployment
-                var deployUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects/{projectName}/deployments";
-                var deployResponse = await client.PostAsync(deployUrl, new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
+        //        // Trigger deployment
+        //        var deployUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects/{projectName}/deployments";
+        //        var deployResponse = await client.PostAsync(deployUrl, new StringContent("{}", System.Text.Encoding.UTF8, "application/json"));
 
-                return new DeploymentResponse
-                {
-                    Success = deployResponse.IsSuccessStatusCode,
-                    Message = deployResponse.IsSuccessStatusCode ? "Cloudflare deployment started successfully" : "Cloudflare deployment failed",
-                    DeploymentUrl = $"https://{deploymentUrl}"
-                };
-            }
-            catch (Exception ex)
-            {
-                return new DeploymentResponse
-                {
-                    Success = false,
-                    Message = $"Cloudflare deployment error: {ex.Message}"
-                };
-            }
-        }
+        //        return new DeploymentResponse
+        //        {
+        //            Success = deployResponse.IsSuccessStatusCode,
+        //            Message = deployResponse.IsSuccessStatusCode ? "Cloudflare deployment started successfully" : "Cloudflare deployment failed",
+        //            DeploymentUrl = $"https://{deploymentUrl}"
+        //        };
+        //    }
+        //    catch (Exception ex)
+        //    {
+        //        return new DeploymentResponse
+        //        {
+        //            Success = false,
+        //            Message = $"Cloudflare deployment error: {ex.Message}"
+        //        };
+        //    }
+        //}
 
-        // Helper function for Netlify deployment
-        private async Task<DeploymentResponse> DeployToNetlifyWithConfig(string repoPath, string branch, CommonConfig config)
-        {
-            try
-            {
-                var swiftDeployToken = _configuration["SwiftDeploy:NetlifyToken"];
-                if (string.IsNullOrEmpty(swiftDeployToken))
-                    throw new Exception("SwiftDeploy Netlify token not configured");
-
-                using var client = new HttpClient();
-                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", swiftDeployToken);
-
-                var sitePayload = new
-                {
-                    name = $"swiftdeploy-{Guid.NewGuid().ToString().Substring(0, 8)}",
-                    repo = new
-                    {
-                        provider = "github",
-                        repo = $"swiftdeploy-repos/{repoPath.Split('/').Last()}",
-                        branch = branch
-                    },
-                    build_settings = new
-                    {
-                        cmd = config.BuildCommand,
-                        dir = config.OutputDirectory
-                    }
-                };
-
-                var createSiteResp = await client.PostAsJsonAsync("https://api.netlify.com/api/v1/sites", sitePayload);
-                var siteResponseBody = await createSiteResp.Content.ReadAsStringAsync();
-
-                if (!createSiteResp.IsSuccessStatusCode)
-                    throw new Exception($"Netlify site creation failed: {siteResponseBody}");
-
-                var siteData = JsonDocument.Parse(siteResponseBody);
-                var siteId = siteData.RootElement.GetProperty("id").GetString();
-                var siteUrl = siteData.RootElement.GetProperty("url").GetString();
-
-                // Trigger build
-                var buildResp = await client.PostAsync($"https://api.netlify.com/api/v1/sites/{siteId}/builds", null);
-
-                return new DeploymentResponse
-                {
-                    Success = buildResp.IsSuccessStatusCode,
-                    Message = buildResp.IsSuccessStatusCode ? "Netlify deployment started successfully" : "Netlify deployment failed",
-                    DeploymentUrl = siteUrl
-                };
-            }
-            catch (Exception ex)
-            {
-                return new DeploymentResponse
-                {
-                    Success = false,
-                    Message = $"Netlify deployment error: {ex.Message}"
-                };
-            }
-        }
-
-        // Helper function for Vercel deployment
-        private async Task<DeploymentResponse> DeployToVercelWithConfig(string repoPath, string branch, CommonConfig config)
-        {
-            try
-            {
-                var swiftDeployToken = _configuration["SwiftDeploy:VercelToken"];
-                if (string.IsNullOrEmpty(swiftDeployToken))
-                    throw new Exception("SwiftDeploy Vercel token not configured");
-
-                using var client = new HttpClient();
-                client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", swiftDeployToken);
-
-                var payload = new
-                {
-                    name = $"swiftdeploy-{Guid.NewGuid().ToString()[..8]}",
-                    gitRepository = new
-                    {
-                        type = "github",
-                        repo = $"swiftdeploy-repos/{repoPath.Split('/').Last()}",
-                        ref_ = branch
-                    },
-                    buildCommand = config.BuildCommand,
-                    outputDirectory = config.OutputDirectory,
-                    installCommand = config.InstallCommand
-                };
-
-                var deployResponse = await client.PostAsJsonAsync("https://api.vercel.com/v13/deployments", payload);
-                var body = await deployResponse.Content.ReadAsStringAsync();
-
-                if (!deployResponse.IsSuccessStatusCode)
-                    throw new Exception($"Vercel deployment failed: {body}");
-
-                var data = JsonDocument.Parse(body);
-                var deploymentUrl = data.RootElement.GetProperty("url").GetString();
-
-                return new DeploymentResponse
-                {
-                    Success = true,
-                    Message = "Vercel deployment started successfully",
-                    DeploymentUrl = $"https://{deploymentUrl}"
-                };
-            }
-            catch (Exception ex)
-            {
-                return new DeploymentResponse
-                {
-                    Success = false,
-                    Message = $"Vercel deployment error: {ex.Message}"
-                };
-            }
-        }// Helper function to generate Cloudflare project name
         private string GenerateCloudflareProjectName(string repo, string branch)
         {
             string raw = $"{repo}-{branch}-{DateTimeOffset.UtcNow.ToUnixTimeSeconds()}";

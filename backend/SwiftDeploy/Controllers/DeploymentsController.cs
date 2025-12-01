@@ -87,7 +87,7 @@ namespace SwiftDeploy.Controllers
         }
 
         [HttpPost("latest")]
-        public IActionResult GetLatestDeploymentById(string repoId)
+        public IActionResult GetLatestDeploymentById([FromBody] string repoId)
         {
             var deployments = _deployments.Find(d => d.RepoId == repoId).SortByDescending(d=>d.DeployedAt).FirstOrDefault();
             return Ok(deployments);
