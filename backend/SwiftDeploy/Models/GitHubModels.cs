@@ -93,7 +93,8 @@ namespace SwiftDeploy.Models
             public string DeploymentUrl { get; set; }
             public string ConfigFileUrl { get; set; }
             public DeploymentStatus Status { get; set; }
-        }
+       
+    }
 
         public class DeploymentStatusResponse
         {
@@ -118,5 +119,7 @@ namespace SwiftDeploy.Models
             public string GitHubRepoName { get; set; }
             public string GitHubRepoUrl { get; set; }
             public string DeploymentUrl { get; set; }
-        }
+          
+        
+    }
 }

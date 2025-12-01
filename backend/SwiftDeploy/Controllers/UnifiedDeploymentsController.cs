@@ -894,6 +894,7 @@ namespace SwiftDeploy.Controllers
             }
         }
 
+
       private async Task<DeploymentResponse> DeployToVercelWithUserRepo(
       string repoPath,
       string branch,
@@ -1324,40 +1325,102 @@ namespace SwiftDeploy.Controllers
         // ============================================
         // VERCEL DELETE
         // ============================================
+        // ============================================
+        // VERCEL DELETE - COMPLETE IMPLEMENTATION
+        // ============================================
+
+        /// <summary>
+        /// Delete Vercel deployment by querying Vercel API to find the project
+        /// </summary>
         private async Task<DeploymentResponse> DeleteVercelDeployment(ProjectInfo project, string vercelToken)
         {
             try
             {
-                _logger.LogInformation($"Deleting Vercel project: {project.ProjectId}");
+                _logger.LogInformation($"Deleting Vercel project: {project.ProjectName}");
 
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Authorization =
                     new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", vercelToken);
 
-                // Extract project ID from deployment (if stored)
-                var vercelProjectId = project.ProjectId; // You might need to store this differently
+                // Step 1: Try to extract project name from deployment URL
+                var vercelProjectName = ExtractVercelProjectName(project);
 
-                // Delete project
+                if (string.IsNullOrEmpty(vercelProjectName))
+                {
+                    _logger.LogWarning("Could not extract Vercel project name from deployment URL");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = "Could not determine Vercel project name. Please delete manually from Vercel dashboard."
+                    };
+                }
+
+                _logger.LogInformation($"Extracted Vercel project name: {vercelProjectName}");
+
+                // Step 2: Query Vercel API to find the project ID
+                var vercelProjectId = await GetVercelProjectIdByName(vercelProjectName, vercelToken);
+
+                if (string.IsNullOrEmpty(vercelProjectId))
+                {
+                    _logger.LogWarning($"Vercel project '{vercelProjectName}' not found in your account");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = $"Vercel project '{vercelProjectName}' not found. It may have been deleted already or you don't have access to it."
+                    };
+                }
+
+                _logger.LogInformation($"Found Vercel project ID: {vercelProjectId}");
+
+                // Step 3: Delete the project using the found ID
                 var deleteUrl = $"https://api.vercel.com/v9/projects/{vercelProjectId}";
+
+                _logger.LogInformation($"Deleting Vercel project at: {deleteUrl}");
+
                 var response = await client.DeleteAsync(deleteUrl);
                 var body = await response.Content.ReadAsStringAsync();
 
-                if (response.IsSuccessStatusCode)
+                if (response.IsSuccessStatusCode || response.StatusCode == System.Net.HttpStatusCode.NoContent)
                 {
-                    _logger.LogInformation($"✅ Vercel project deleted: {vercelProjectId}");
+                    _logger.LogInformation($"✅ Vercel project deleted successfully: {vercelProjectName} (ID: {vercelProjectId})");
                     return new DeploymentResponse
                     {
                         Success = true,
-                        Message = "Vercel deployment deleted successfully"
+                        Message = $"Vercel deployment '{vercelProjectName}' deleted successfully"
+                    };
+                }
+                else if (response.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    _logger.LogWarning($"Vercel project not found (may be already deleted): {vercelProjectName}");
+                    return new DeploymentResponse
+                    {
+                        Success = true, // Consider it success if already deleted
+                        Message = "Vercel deployment not found (may have been deleted already)"
                     };
                 }
                 else
                 {
                     _logger.LogError($"Failed to delete Vercel project: {body}");
+
+                    // Try to parse error message
+                    string errorMessage = body;
+                    try
+                    {
+                        var errorDoc = JsonDocument.Parse(body);
+                        if (errorDoc.RootElement.TryGetProperty("error", out var errorProp))
+                        {
+                            if (errorProp.TryGetProperty("message", out var msgProp))
+                            {
+                                errorMessage = msgProp.GetString();
+                            }
+                        }
+                    }
+                    catch { /* Ignore JSON parse errors */ }
+
                     return new DeploymentResponse
                     {
                         Success = false,
-                        Message = $"Failed to delete Vercel deployment: {body}"
+                        Message = $"Failed to delete Vercel deployment: {errorMessage}"
                     };
                 }
             }
@@ -1369,6 +1432,148 @@ namespace SwiftDeploy.Controllers
                     Success = false,
                     Message = $"Error deleting Vercel deployment: {ex.Message}"
                 };
+            }
+        }
+
+        /// <summary>
+        /// Extract Vercel project name from deployment URL or project info
+        /// </summary>
+        private string ExtractVercelProjectName(ProjectInfo project)
+        {
+            try
+            {
+                // Method 1: Extract from deployment URL
+                if (!string.IsNullOrEmpty(project.DeploymentUrl))
+                {
+                    var uri = new Uri(project.DeploymentUrl);
+                    var host = uri.Host;
+
+                    // Format: https://project-name.vercel.app or https://project-name-hash.vercel.app
+                    if (host.EndsWith(".vercel.app"))
+                    {
+                        var projectName = host.Replace(".vercel.app", "");
+                        _logger.LogInformation($"Extracted project name from URL: {projectName}");
+                        return projectName;
+                    }
+
+                    // Format: Custom domain - try to use project name instead
+                    _logger.LogWarning($"Deployment URL uses custom domain: {host}");
+                }
+
+                // Method 2: Use GitHub repo name as fallback
+                if (!string.IsNullOrEmpty(project.GitHubRepoName))
+                {
+                    var repoParts = project.GitHubRepoName.Split('/');
+                    if (repoParts.Length >= 2)
+                    {
+                        var repoName = repoParts[1].ToLower().Replace("_", "-").Replace(" ", "-");
+                        _logger.LogInformation($"Using GitHub repo name as fallback: {repoName}");
+                        return repoName;
+                    }
+                }
+
+                // Method 3: Use project name as last resort
+                if (!string.IsNullOrEmpty(project.ProjectName))
+                {
+                    var sanitizedName = project.ProjectName.ToLower()
+                        .Replace("_", "-")
+                        .Replace(" ", "-")
+                        .Replace(".", "-");
+                    _logger.LogInformation($"Using sanitized project name: {sanitizedName}");
+                    return sanitizedName;
+                }
+
+                _logger.LogWarning("Could not extract Vercel project name from any source");
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error extracting Vercel project name");
+                return null;
+            }
+        }
+
+        /// <summary>
+        /// Query Vercel API to find project ID by name
+        /// </summary>
+        private async Task<string> GetVercelProjectIdByName(string projectName, string vercelToken)
+        {
+            try
+            {
+                _logger.LogInformation($"Querying Vercel API for project: {projectName}");
+
+                using var client = new HttpClient();
+                client.DefaultRequestHeaders.Authorization =
+                    new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", vercelToken);
+
+                // List all projects (paginated)
+                var listUrl = "https://api.vercel.com/v9/projects?limit=100";
+                var response = await client.GetAsync(listUrl);
+                var body = await response.Content.ReadAsStringAsync();
+
+                if (!response.IsSuccessStatusCode)
+                {
+                    _logger.LogError($"Failed to list Vercel projects: {body}");
+                    return null;
+                }
+
+                var result = JsonDocument.Parse(body);
+
+                if (!result.RootElement.TryGetProperty("projects", out var projectsArray))
+                {
+                    _logger.LogWarning("No 'projects' property in Vercel API response");
+                    return null;
+                }
+
+                // Search for matching project
+                foreach (var proj in projectsArray.EnumerateArray())
+                {
+                    if (proj.TryGetProperty("name", out var nameProp))
+                    {
+                        var name = nameProp.GetString();
+
+                        // Exact match
+                        if (name.Equals(projectName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (proj.TryGetProperty("id", out var idProp))
+                            {
+                                var projectId = idProp.GetString();
+                                _logger.LogInformation($"✅ Found exact match - Project: {name}, ID: {projectId}");
+                                return projectId;
+                            }
+                        }
+
+                        // Partial match (in case Vercel added suffix)
+                        if (name.StartsWith(projectName, StringComparison.OrdinalIgnoreCase))
+                        {
+                            if (proj.TryGetProperty("id", out var idProp))
+                            {
+                                var projectId = idProp.GetString();
+                                _logger.LogInformation($"✅ Found partial match - Project: {name}, ID: {projectId}");
+                                return projectId;
+                            }
+                        }
+                    }
+                }
+
+                _logger.LogWarning($"No matching Vercel project found for: {projectName}");
+
+                // Log available projects for debugging
+                _logger.LogInformation("Available Vercel projects:");
+                foreach (var proj in projectsArray.EnumerateArray())
+                {
+                    if (proj.TryGetProperty("name", out var nameProp))
+                    {
+                        _logger.LogInformation($"  - {nameProp.GetString()}");
+                    }
+                }
+
+                return null;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error querying Vercel projects");
+                return null;
             }
         }
 
