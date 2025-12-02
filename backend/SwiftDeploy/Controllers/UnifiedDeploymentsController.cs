@@ -202,7 +202,7 @@ namespace SwiftDeploy.Controllers
         {
             var projectId = Guid.NewGuid().ToString();
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            string localProjectPath = null;
+            //string localProjectPath = null;
 
             try
             {
@@ -252,7 +252,9 @@ namespace SwiftDeploy.Controllers
 
                 // Step 4: Generate and push config
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating deployment configuration...");
-                await _deploymentService.PushConfigToRepoAsync(request.RepoName, request.Platform, request.Config);
+                string reponame = request.RepoName.Split("/")[1];
+
+                await _deploymentService.PushConfigToRepoAsync(reponame, request.Platform, request.Config);
 
                 // Step 5: Deploy to platform
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Deploying, $"Deploying to {request.Platform}...");
@@ -368,15 +370,15 @@ namespace SwiftDeploy.Controllers
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, ex.Message);
 
                 // ⭐ Cleanup on error
-                try
-                {
-                    if (!string.IsNullOrEmpty(localProjectPath) && Directory.Exists(localProjectPath))
-                    {
-                        Directory.Delete(localProjectPath, true);
-                        _logger.LogInformation($"Cleaned up extracted folder after error: {localProjectPath}");
-                    }
-                }
-                catch { /* Ignore cleanup errors */ }
+                //try
+                //{
+                //    if (!string.IsNullOrEmpty(localProjectPath) && Directory.Exists(localProjectPath))
+                //    {
+                //        Directory.Delete(localProjectPath, true);
+                //        _logger.LogInformation($"Cleaned up extracted folder after error: {localProjectPath}");
+                //    }
+                //}
+                //catch { /* Ignore cleanup errors */ }
 
                 // Save error deployment to MongoDB
                 try
