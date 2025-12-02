@@ -18,5 +18,19 @@ namespace SwiftDeploy.Models
         public string ServiceUrl { get; set; }        // Deployed site URL
         public string ConfigFileUrl { get; set; }     // Config file URL in GitHub
         public DateTime DeployedAt { get; set; } = DateTime.UtcNow;
+        // Models/Deployment.cs
+
+            // ⭐ NEW: Store platform-specific project ID
+            [BsonElement("platformProjectId")]
+            public string PlatformProjectId { get; set; }
+
+            // ⭐ NEW: Store platform-specific project name (for Cloudflare, Netlify)
+            [BsonElement("platformProjectName")]
+            public string PlatformProjectName { get; set; }
+
+            // ⭐ NEW: Store our internal project ID (GUID)
+            [BsonElement("internalProjectId")]
+            public string InternalProjectId { get; set; }
+        }
     }
-}
+
