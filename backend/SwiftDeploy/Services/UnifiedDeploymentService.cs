@@ -25,11 +25,11 @@ namespace SwiftDeploy.Services.Interfaces
         private static readonly Dictionary<string, ProjectInfo> _projectStatuses = new();
 
         public UnifiedDeploymentService(
-            IConfiguration configuration,
-            ITemplateEngine templateEngine,
-            ILogger<UnifiedDeploymentService> logger,
-            MongoDbService mongoDbService,
-            IHttpContextAccessor httpContextAccessor)
+        IConfiguration configuration,
+        ITemplateEngine templateEngine,
+        ILogger<UnifiedDeploymentService> logger,
+        MongoDbService mongoDbService,
+        IHttpContextAccessor httpContextAccessor)
         {
             _configuration = configuration;
             _templateEngine = templateEngine;
@@ -40,24 +40,22 @@ namespace SwiftDeploy.Services.Interfaces
             // Initialize GitHub client with SwiftDeploy token
             var swiftDeployToken = _configuration["SwiftDeploy:GitHubToken"];
 
-            if (!string.IsNullOrEmpty(swiftDeployToken))
+            if (string.IsNullOrEmpty(swiftDeployToken))
             {
-                _gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
-                {
-                    Credentials = new Credentials(swiftDeployToken)
-                };
-                _logger.LogInformation("GitHub client initialized with SwiftDeploy token");
+                _logger.LogError("❌ SwiftDeploy GitHub token is missing in configuration!");
+                throw new Exception("SwiftDeploy:GitHubToken is not configured in appsettings.json");
             }
-            else
+
+            _gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
             {
-                // Initialize without credentials - will use user tokens per request
-                _gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"));
-                _logger.LogWarning("GitHub client initialized without credentials. Will use user tokens for operations.");
-            }
+                Credentials = new Credentials(swiftDeployToken)
+            };
+
+            _logger.LogInformation("✅ GitHub client initialized with SwiftDeploy token");
         }
 
-        
-        
+
+
         // ⭐ Helper: Get user's GitHub token from header OR database
         private async Task<string?> GetUserGitHubTokenAsync(string userId)
         {
@@ -259,6 +257,12 @@ namespace SwiftDeploy.Services.Interfaces
         {
             try
             {
+                //var swiftDeployToken = _configuration["SwiftDeploy:GitHubToken"];
+
+                //_gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
+                //{
+                //    Credentials = new Credentials(swiftDeployToken)
+                //};
                 var orgName = (await _gitHubClient.User.Current()).Login;
 
                 // ⭐ FIX: Find the actual project root (skip empty wrapper directories)
