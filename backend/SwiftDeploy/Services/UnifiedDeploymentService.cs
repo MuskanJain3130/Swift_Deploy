@@ -170,7 +170,6 @@ namespace SwiftDeploy.Services.Interfaces
             // fallback to service-level client (may be unauthenticated or use SwiftDeploy token)
             return _gitHubClient;
         }
-
         public async Task<string> UploadAndExtractProjectAsync(IFormFile zipFile, string projectName)
         {
             try
@@ -200,6 +199,7 @@ namespace SwiftDeploy.Services.Interfaces
             }
         }
 
+
         public async Task<string> CreateSwiftDeployRepoAsync(string projectName, string description = null)
         {
             try
@@ -227,19 +227,52 @@ namespace SwiftDeploy.Services.Interfaces
                 throw;
             }
         }
+        private string GetActualProjectRoot(string extractedPath)
+        {
+            try
+            {
+                var dirs = Directory.GetDirectories(extractedPath);
+                var files = Directory.GetFiles(extractedPath);
+
+                // If only 1 subdirectory and no files in root, dive into that directory
+                if (dirs.Length == 1 && files.Length == 0)
+                {
+                    var singleSubDir = dirs[0];
+                    _logger.LogInformation($"Found single wrapper directory: {singleSubDir}, diving in...");
+
+                    // Recursively check if we need to go deeper
+                    return GetActualProjectRoot(singleSubDir);
+                }
+
+                // Otherwise, this is the actual project root
+                _logger.LogInformation($"Actual project root: {extractedPath}");
+                return extractedPath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error determining project root");
+                return extractedPath; // Fallback to original path
+            }
+        }
 
         public async Task<bool> PushCodeToSwiftDeployRepoAsync(string repoName, string localProjectPath)
         {
             try
             {
-                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeploy-repos";
+                var orgName = (await _gitHubClient.User.Current()).Login;
 
-                // Get all files from local project
-                var files = Directory.GetFiles(localProjectPath, "*", SearchOption.AllDirectories);
+                // ⭐ FIX: Find the actual project root (skip empty wrapper directories)
+                var projectRoot = GetActualProjectRoot(localProjectPath);
+
+                _logger.LogInformation($"Pushing code from {projectRoot} to {orgName}/{repoName}");
+
+                // Get all files from the actual project root
+                var files = Directory.GetFiles(projectRoot, "*", SearchOption.AllDirectories);
 
                 foreach (var filePath in files)
                 {
-                    var relativePath = Path.GetRelativePath(localProjectPath, filePath);
+                    // ⭐ Calculate relative path from the ACTUAL project root
+                    var relativePath = Path.GetRelativePath(projectRoot, filePath);
                     var content = await File.ReadAllTextAsync(filePath);
 
                     try
@@ -250,12 +283,16 @@ namespace SwiftDeploy.Services.Interfaces
                         // Update existing file
                         var updateRequest = new UpdateFileRequest($"Update {relativePath}", content, existingFile[0].Sha);
                         await _gitHubClient.Repository.Content.UpdateFile(orgName, repoName, relativePath, updateRequest);
+
+                        _logger.LogInformation($"Updated file: {relativePath}");
                     }
                     catch (NotFoundException)
                     {
                         // Create new file
                         var createRequest = new CreateFileRequest($"Add {relativePath}", content);
                         await _gitHubClient.Repository.Content.CreateFile(orgName, repoName, relativePath, createRequest);
+
+                        _logger.LogInformation($"Created file: {relativePath}");
                     }
                 }
 
