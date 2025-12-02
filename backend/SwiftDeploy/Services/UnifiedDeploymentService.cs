@@ -314,7 +314,8 @@ namespace SwiftDeploy.Services.Interfaces
         {
             try
             {
-                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeploy-repos";
+
+                var orgName = (await _gitHubClient.User.Current()).Login;
 
                 // Generate config content
                 var configContent = await _templateEngine.GenerateConfigAsync(platform, config);
