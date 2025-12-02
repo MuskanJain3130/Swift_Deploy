@@ -250,56 +250,65 @@ namespace SwiftDeploy.Controllers
                 // ⭐ Step 1: Upload/Download and extract project
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Processing, "Extracting project files...");
 
-                if (!string.IsNullOrWhiteSpace(request.AzureBlobName))
-                {
-                    // ⭐ Download from Azure Blob Storage
-                    _logger.LogInformation($"Downloading project from Azure blob: {request.AzureBlobName}");
-                    localProjectPath = await _deploymentService.DownloadAndExtractFromAzureAsync(request.AzureBlobName, request.ProjectName);
-                }
-                //else
-                //{
-                //    // Upload from form file (existing logic)
-                //    _logger.LogInformation($"Uploading project from form file");
-                //    localProjectPath = await _deploymentService.UploadAndExtractProjectAsync(request.ProjectZip, request.ProjectName);
-                //}
-
-                // Step 2: Create GitHub repo on SwiftDeploy account
-                await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.CreatingRepo, "Creating GitHub repository...");
-                var repoName = await _deploymentService.CreateSwiftDeployRepoAsync(request.ProjectName, request.Description);
-                projectInfo.GitHubRepoName = repoName;
-                projectInfo.GitHubRepoUrl = $"https://github.com/swiftdeployapp/{repoName}";
-
-                // Step 3: Push code to repo
-                await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.PushingCode, "Pushing code to repository...");
-                await _deploymentService.PushCodeToSwiftDeployRepoAsync(repoName, localProjectPath);
-
-                // ⭐ Cleanup: Delete extracted folder after pushing to GitHub
-                try
-                {
-                    if (Directory.Exists(localProjectPath))
-                    {
-                        Directory.Delete(localProjectPath, true);
-                        _logger.LogInformation($"Deleted extracted project folder: {localProjectPath}");
-                    }
-                }
-                catch (Exception cleanupEx)
-                {
-                    _logger.LogWarning(cleanupEx, $"Failed to cleanup extracted folder: {localProjectPath}");
-                    // Don't fail the deployment for cleanup errors
-                }
-
                 // Step 4: Generate and push config
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating deployment configuration...");
-                await _deploymentService.PushConfigToRepoAsync(repoName, request.Platform, request.Config);
+                await _deploymentService.PushConfigToRepoAsync(request.RepoName, request.Platform, request.Config);
 
                 // Step 5: Deploy to platform
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Deploying, $"Deploying to {request.Platform}...");
 
+                // string repoPath,
+                //          string branch,
+                //          CommonConfig config,
+                //string vercelToken,
+                //string githubToken
+
+                // Step 1: Generate and save config (skip for GitHub Pages)
+                string configFileUrl = null;
+
+                if (request.Platform.ToLower() != "githubpages")
+                {
+                    await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating and saving configuration...");
+
+                    var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
+                    var configResult = await gitHubService.GenerateAndSaveConfigAsync(
+                        request.Platform,
+                        request.RepoName,
+                        _configuration["SwiftDeploy:GitHubToken"],
+                        "main",
+                        request.Config
+                    );
+
+                    if (!configResult.Success)
+                    {
+                        await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed,
+                            $"Failed to save config: {configResult.Message}");
+
+                        return BadRequest(new
+                        {
+                            success = false,
+                            message = $"Failed to save config to GitHub: {configResult.Message}",
+                            projectId = projectId,
+                            gitHubRepoUrl = projectInfo.GitHubRepoUrl,
+                            status = (int)DeploymentStatus.Failed
+                        });
+                    }
+
+                    configFileUrl = configResult.FileUrl;
+                    _logger.LogInformation($"✅ Config file saved: {configFileUrl}");
+                }
+                else
+                {
+                    _logger.LogInformation("Skipping config generation for GitHub Pages");
+                }
+
                 DeploymentResponse deploymentResult = request.Platform.ToLower() switch
                 {
-                    "cloudflare" => await _deploymentService.DeployToCloudflareAsync(repoName, "main", request.Config, userId, platformToken),
-                    "netlify" => await _deploymentService.DeployToNetlifyAsync(repoName, "main", request.Config, userId, platformToken),
-                    "vercel" => await _deploymentService.DeployToVercelAsync(repoName, "main", request.Config, userId, platformToken),
+                    "cloudflare" => await DeployToCloudflareWithUserRepo(request.RepoName, "main", request.Config, platformToken, _configuration["SwiftDeploy:GitHubToken"]),
+                    "netlify" => await _deploymentService.DeployToNetlifyAsync(request.RepoName,
+ "main", request.Config, userId, platformToken),
+                    "vercel" => await DeployToVercelWithUserRepo(request.RepoName,
+ "main", request.Config, platformToken, _configuration["SwiftDeploy:GitHubToken"]),
                     _ => throw new ArgumentException($"Unsupported platform: {request.Platform}")
                 };
 
