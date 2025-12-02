@@ -1964,6 +1964,7 @@ namespace SwiftDeploy.Controllers
 
                 if (!accountResponse.IsSuccessStatusCode)
                 {
+                    _logger.LogError($"Failed to get Cloudflare account: {accountBody}");
                     return new DeploymentResponse
                     {
                         Success = false,
@@ -1972,29 +1973,117 @@ namespace SwiftDeploy.Controllers
                 }
 
                 var accountJson = JsonDocument.Parse(accountBody);
-                var accountId = accountJson.RootElement.GetProperty("result")[0].GetProperty("id").GetString();
 
-                // Delete using project name (Cloudflare uses project name, not ID)
+                // ⭐ Check if result array has items
+                if (!accountJson.RootElement.TryGetProperty("result", out var resultArray) ||
+                    resultArray.GetArrayLength() == 0)
+                {
+                    _logger.LogError("No Cloudflare accounts found");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = "No Cloudflare accounts found"
+                    };
+                }
+
+                var accountId = resultArray[0].GetProperty("id").GetString();
+                _logger.LogInformation($"✅ Cloudflare Account ID: {accountId}");
+
+                // ⭐ STEP 1: First, verify the project exists
+                var listProjectsUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects";
+                var listResponse = await client.GetAsync(listProjectsUrl);
+                var listBody = await listResponse.Content.ReadAsStringAsync();
+
+                _logger.LogInformation($"Cloudflare list projects response: {listBody}");
+
+                if (listResponse.IsSuccessStatusCode)
+                {
+                    var listJson = JsonDocument.Parse(listBody);
+                    if (listJson.RootElement.TryGetProperty("result", out var projects))
+                    {
+                        bool projectFound = false;
+                        foreach (var project in projects.EnumerateArray())
+                        {
+                            if (project.TryGetProperty("name", out var nameProp))
+                            {
+                                var name = nameProp.GetString();
+                                _logger.LogInformation($"Found Cloudflare project: {name}");
+
+                                if (name.Equals(cloudflareProjectName, StringComparison.OrdinalIgnoreCase))
+                                {
+                                    projectFound = true;
+                                    _logger.LogInformation($"✅ Confirmed project exists: {cloudflareProjectName}");
+                                    break;
+                                }
+                            }
+                        }
+
+                        if (!projectFound)
+                        {
+                            _logger.LogWarning($"Cloudflare project not found: {cloudflareProjectName}");
+                            return new DeploymentResponse
+                            {
+                                Success = true, // Consider success if already deleted
+                                Message = $"Cloudflare project '{cloudflareProjectName}' not found (may have been deleted already)"
+                            };
+                        }
+                    }
+                }
+
+                // ⭐ STEP 2: Delete the project using project name
                 var deleteUrl = $"https://api.cloudflare.com/client/v4/accounts/{accountId}/pages/projects/{cloudflareProjectName}";
+
+                _logger.LogInformation($"DELETE request to: {deleteUrl}");
+
                 var deleteResponse = await client.DeleteAsync(deleteUrl);
                 var deleteBody = await deleteResponse.Content.ReadAsStringAsync();
 
-                if (deleteResponse.IsSuccessStatusCode)
+                _logger.LogInformation($"Cloudflare delete response status: {deleteResponse.StatusCode}");
+                _logger.LogInformation($"Cloudflare delete response body: {deleteBody}");
+
+                // ⭐ STEP 3: Check response
+                if (deleteResponse.IsSuccessStatusCode || deleteResponse.StatusCode == System.Net.HttpStatusCode.NoContent)
                 {
-                    _logger.LogInformation($"✅ Cloudflare project deleted: {cloudflareProjectName}");
+                    _logger.LogInformation($"✅ Cloudflare project deleted successfully: {cloudflareProjectName}");
                     return new DeploymentResponse
                     {
                         Success = true,
-                        Message = "Cloudflare deployment deleted successfully"
+                        Message = $"Cloudflare project '{cloudflareProjectName}' deleted successfully"
+                    };
+                }
+                else if (deleteResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
+                {
+                    _logger.LogWarning($"Cloudflare project not found during deletion: {cloudflareProjectName}");
+                    return new DeploymentResponse
+                    {
+                        Success = true, // Consider success if already deleted
+                        Message = "Cloudflare project not found (may have been deleted already)"
                     };
                 }
                 else
                 {
-                    _logger.LogError($"Failed to delete Cloudflare project: {deleteBody}");
+                    // Try to parse error message
+                    string errorMessage = deleteBody;
+                    try
+                    {
+                        var errorDoc = JsonDocument.Parse(deleteBody);
+                        if (errorDoc.RootElement.TryGetProperty("errors", out var errors) &&
+                            errors.GetArrayLength() > 0)
+                        {
+                            var firstError = errors[0];
+                            if (firstError.TryGetProperty("message", out var msgProp))
+                            {
+                                errorMessage = msgProp.GetString();
+                            }
+                        }
+                    }
+                    catch { /* Ignore JSON parse errors */ }
+
+                    _logger.LogError($"Failed to delete Cloudflare project: {errorMessage}");
                     return new DeploymentResponse
                     {
                         Success = false,
-                        Message = $"Failed to delete Cloudflare deployment: {deleteBody}"
+                        Message = $"Failed to delete Cloudflare project: {errorMessage}"
                     };
                 }
             }
@@ -2463,20 +2552,47 @@ namespace SwiftDeploy.Controllers
         {
             try
             {
-                _logger.LogInformation($"Disabling GitHub Pages for: {project.GitHubRepoName}");
+                // Extract owner and repo
+                string owner = null;
+                string repo = null;
 
-                var repoParts = project.GitHubRepoName.Split('/');
-                if (repoParts.Length != 2)
+                if (!string.IsNullOrEmpty(project.GitHubRepoName))
+                {
+                    var repoParts = project.GitHubRepoName.Split('/');
+                    if (repoParts.Length == 2)
+                    {
+                        owner = repoParts[0];
+                        repo = repoParts[1];
+                    }
+                }
+
+                if (string.IsNullOrEmpty(owner) && !string.IsNullOrEmpty(project.GitHubRepoUrl))
+                {
+                    try
+                    {
+                        var uri = new Uri(project.GitHubRepoUrl);
+                        var pathParts = uri.AbsolutePath.Trim('/').Split('/');
+                        if (pathParts.Length >= 2)
+                        {
+                            owner = pathParts[0];
+                            repo = pathParts[1];
+                        }
+                    }
+                    catch { }
+                }
+
+                if (string.IsNullOrEmpty(owner) || string.IsNullOrEmpty(repo))
                 {
                     return new DeploymentResponse
                     {
                         Success = false,
-                        Message = "Invalid repository format"
+                        Message = "Could not determine GitHub repository information"
                     };
                 }
 
-                var owner = repoParts[0];
-                var repo = repoParts[1];
+                Console.WriteLine($"=== DELETING GITHUB PAGES ===");
+                Console.WriteLine($"Repository: {owner}/{repo}");
+                Console.WriteLine($"URL: https://api.github.com/repos/{owner}/{repo}/pages");
 
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Authorization =
@@ -2486,37 +2602,100 @@ namespace SwiftDeploy.Controllers
                     new System.Net.Http.Headers.MediaTypeWithQualityHeaderValue("application/vnd.github+json"));
                 client.DefaultRequestHeaders.Add("X-GitHub-Api-Version", "2022-11-28");
 
-                // Delete GitHub Pages site
-                var deleteUrl = $"https://api.github.com/repos/{owner}/{repo}/pages";
-                var deleteResponse = await client.DeleteAsync(deleteUrl);
+                // Check if GitHub Pages is enabled
+                var checkUrl = $"https://api.github.com/repos/{owner}/{repo}/pages";
+                var checkResponse = await client.GetAsync(checkUrl);
+                var checkBody = await checkResponse.Content.ReadAsStringAsync();
 
-                if (deleteResponse.IsSuccessStatusCode || deleteResponse.StatusCode == System.Net.HttpStatusCode.NoContent)
+                Console.WriteLine($"CHECK Status: {(int)checkResponse.StatusCode}");
+                Console.WriteLine($"CHECK Body: {checkBody}");
+
+                if (checkResponse.StatusCode == System.Net.HttpStatusCode.NotFound)
                 {
-                    _logger.LogInformation($"✅ GitHub Pages disabled for: {owner}/{repo}");
+                    Console.WriteLine("GitHub Pages is NOT enabled (404)");
                     return new DeploymentResponse
                     {
                         Success = true,
-                        Message = "GitHub Pages deployment disabled successfully"
+                        Message = "GitHub Pages is not enabled"
+                    };
+                }
+
+                // Delete GitHub Pages
+                var deleteUrl = $"https://api.github.com/repos/{owner}/{repo}/pages";
+
+                Console.WriteLine($"Sending DELETE request...");
+
+                var deleteResponse = await client.DeleteAsync(deleteUrl);
+
+                // ⭐ CRITICAL: Get status code FIRST
+                var statusCode = (int)deleteResponse.StatusCode;
+                var statusName = deleteResponse.StatusCode.ToString();
+
+                Console.WriteLine($"DELETE Status Code: {statusCode}");
+                Console.WriteLine($"DELETE Status Name: {statusName}");
+
+                // ⭐ Then read body
+                var deleteBody = await deleteResponse.Content.ReadAsStringAsync();
+
+                Console.WriteLine($"DELETE Body: '{deleteBody}'");
+                Console.WriteLine($"DELETE Body Length: {deleteBody?.Length ?? 0}");
+                Console.WriteLine($"DELETE IsSuccessStatusCode: {deleteResponse.IsSuccessStatusCode}");
+
+                // Handle response
+                if (deleteResponse.IsSuccessStatusCode || statusCode == 204)
+                {
+                    Console.WriteLine("✅ SUCCESS - GitHub Pages deleted");
+                    return new DeploymentResponse
+                    {
+                        Success = true,
+                        Message = $"GitHub Pages disabled successfully for {owner}/{repo}"
+                    };
+                }
+                else if (statusCode == 404)
+                {
+                    Console.WriteLine("✅ NOT FOUND - Already deleted");
+                    return new DeploymentResponse
+                    {
+                        Success = true,
+                        Message = "GitHub Pages not found (already disabled)"
+                    };
+                }
+                else if (statusCode == 403)
+                {
+                    Console.WriteLine("❌ FORBIDDEN - Permission denied");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = "Access denied. Check GitHub token permissions."
+                    };
+                }
+                else if (statusCode == 409)
+                {
+                    Console.WriteLine("❌ CONFLICT - Build in progress");
+                    return new DeploymentResponse
+                    {
+                        Success = false,
+                        Message = "GitHub Pages is building. Try again in a few minutes."
                     };
                 }
                 else
                 {
-                    var deleteBody = await deleteResponse.Content.ReadAsStringAsync();
-                    _logger.LogError($"Failed to disable GitHub Pages: {deleteBody}");
+                    Console.WriteLine($"❌ ERROR - Status {statusCode}");
                     return new DeploymentResponse
                     {
                         Success = false,
-                        Message = $"Failed to disable GitHub Pages: {deleteBody}"
+                        Message = $"GitHub API returned status {statusCode}: {deleteBody}"
                     };
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, "Error disabling GitHub Pages");
+                Console.WriteLine($"❌ EXCEPTION: {ex.Message}");
+                Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 return new DeploymentResponse
                 {
                     Success = false,
-                    Message = $"Error disabling GitHub Pages: {ex.Message}"
+                    Message = $"Error: {ex.Message}"
                 };
             }
         }
