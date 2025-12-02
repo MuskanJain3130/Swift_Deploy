@@ -1,6 +1,8 @@
 ﻿// Services/UnifiedDeploymentService.cs
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Http;
 using MongoDB.Driver;
+using Azure.Storage.Blobs;
 using Octokit;
 using SwiftDeploy.Models;
 using SwiftDeploy.Models.SwiftDeploy.Models;
@@ -202,7 +204,8 @@ namespace SwiftDeploy.Services.Interfaces
         {
             try
             {
-                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeploy-repos";
+                //var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeployapp";
+                var orgName = (await _gitHubClient.User.Current()).Login;
                 var repoName = GenerateRepoName(projectName);
 
                 var newRepo = new NewRepository(repoName)
@@ -213,7 +216,7 @@ namespace SwiftDeploy.Services.Interfaces
                 };
 
                 // Create repo in organization
-                var repo = await _gitHubClient.Repository.Create(orgName, newRepo);
+                var repo = await _gitHubClient.Repository.Create(newRepo);
 
                 _logger.LogInformation($"Created GitHub repo: {repo.FullName}");
                 return repo.Name;
@@ -472,7 +475,7 @@ namespace SwiftDeploy.Services.Interfaces
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", platformToken);
 
-                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeploy-repos";
+                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeployapp";
 
                 var payload = new
                 {
@@ -587,9 +590,79 @@ namespace SwiftDeploy.Services.Interfaces
             var hex = BitConverter.ToString(hash).Replace("-", "").ToLower();
             return $"swiftdeploy-{hex.Substring(0, 10)}";
         }
+        public async Task<string> DownloadAndExtractFromAzureAsync(string blobName, string projectName)
+    {
+        try
+        {
+            var connectionString = _configuration["Azure:ConnectionString"];
+            var containerName = _configuration["Azure:ContainerName"];
 
-        // ⭐ Public method to get GitHub token (for use in controllers)
-        public async Task<string?> GetGitHubTokenForUserAsync(string userId)
+            if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(containerName))
+                throw new Exception("Azure storage configuration missing (Azure:ConnectionString or Azure:ContainerName).");
+
+            // Create temp directory for download and extraction
+            var tempDir = Path.Combine(Path.GetTempPath(), "swiftdeploy", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempDir);
+
+            var localZipPath = Path.Combine(tempDir, blobName);
+            var extractDir = Path.Combine(tempDir, "extracted");
+
+            try
+            {
+                // Download blob to local file
+                var blobServiceClient = new BlobServiceClient(connectionString);
+                var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+                var blobClient = containerClient.GetBlobClient(blobName);
+
+                var exists = await blobClient.ExistsAsync();
+                if (!exists.Value)
+                {
+                    throw new FileNotFoundException($"Blob '{blobName}' not found in container '{containerName}'.");
+                }
+
+                _logger.LogInformation($"Downloading blob {blobName} from Azure...");
+                await blobClient.DownloadToAsync(localZipPath);
+
+                // Extract ZIP file
+                Directory.CreateDirectory(extractDir);
+                _logger.LogInformation($"Extracting {blobName} to {extractDir}...");
+                ZipFile.ExtractToDirectory(localZipPath, extractDir);
+
+                // ⭐ Delete blob from Azure after successful download
+                _logger.LogInformation($"Deleting blob {blobName} from Azure storage...");
+                await blobClient.DeleteIfExistsAsync();
+
+                // ⭐ Delete local zip file (keep only extracted folder)
+                if (File.Exists(localZipPath))
+                {
+                    File.Delete(localZipPath);
+                    _logger.LogInformation($"Deleted local zip file: {localZipPath}");
+                }
+
+                _logger.LogInformation($"Project {projectName} downloaded and extracted from Azure to {extractDir}");
+                return extractDir;
+            }
+            catch (InvalidDataException ide)
+            {
+                _logger.LogError(ide, $"Failed to extract zip file: {localZipPath}");
+
+                // Cleanup on failure
+                if (File.Exists(localZipPath))
+                    File.Delete(localZipPath);
+                if (Directory.Exists(extractDir))
+                    Directory.Delete(extractDir, true);
+
+                throw new Exception("The downloaded file is not a valid zip archive.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error downloading and extracting from Azure for project {projectName}");
+            throw;
+        }
+    }
+    // ⭐ Public method to get GitHub token (for use in controllers)
+    public async Task<string?> GetGitHubTokenForUserAsync(string userId)
         {
             return await GetUserGitHubTokenAsync(userId);
         }

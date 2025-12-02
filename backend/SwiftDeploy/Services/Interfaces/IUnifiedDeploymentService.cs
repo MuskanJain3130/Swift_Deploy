@@ -4,7 +4,9 @@ using SwiftDeploy.Models;
 using DeploymentStatus = SwiftDeploy.Models.DeploymentStatus;
 
         public interface IUnifiedDeploymentService
-        {
+{
+            Task<string> DownloadAndExtractFromAzureAsync(string blobName, string projectName);
+
             Task<string> UploadAndExtractProjectAsync(IFormFile zipFile, string projectName);
             Task<string> CreateSwiftDeployRepoAsync(string projectName, string description = null);
             Task<bool> PushCodeToSwiftDeployRepoAsync(string repoName, string localProjectPath);

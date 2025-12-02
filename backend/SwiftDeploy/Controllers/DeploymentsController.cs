@@ -85,11 +85,18 @@ namespace SwiftDeploy.Controllers
             var deployments = _deployments.Find(d => d.Id == id).FirstOrDefault();
             return Ok(deployments);
         }
+        public class DeploymentRequest
+        {
+            public string RepoId { get; set; }
+        }
 
         [HttpPost("latest")]
-        public IActionResult GetLatestDeploymentById([FromBody] string repoId)
+        public IActionResult GetLatestDeploymentById([FromBody] DeploymentRequest request)
         {
-            var deployments = _deployments.Find(d => d.RepoId == repoId).SortByDescending(d=>d.DeployedAt).FirstOrDefault();
+            var deployments = _deployments
+                .Find(d => d.RepoId == request.RepoId)
+                .SortByDescending(d => d.DeployedAt)
+                .FirstOrDefault();
             return Ok(deployments);
         }
 
