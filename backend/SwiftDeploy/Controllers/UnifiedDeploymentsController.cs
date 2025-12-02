@@ -295,56 +295,11 @@ namespace SwiftDeploy.Controllers
                 // Step 5: Deploy to platform
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Deploying, $"Deploying to {request.Platform}...");
 
-                // string repoPath,
-                //          string branch,
-                //          CommonConfig config,
-                //string vercelToken,
-                //string githubToken
-
-                // Step 1: Generate and save config (skip for GitHub Pages)
-                string configFileUrl = null;
-
-                if (request.Platform.ToLower() != "githubpages")
-                {
-                    await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating and saving configuration...");
-
-                    var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
-                    var configResult = await gitHubService.GenerateAndSaveConfigAsync(
-                        request.Platform,
-                        "swiftdeployapp/"+repoName,
-                        _configuration["SwiftDeploy:GitHubToken"],
-                        "main",
-                        request.Config
-                    );
-
-                    if (!configResult.Success)
-                    {
-                        await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed,
-                            $"Failed to save config: {configResult.Message}");
-
-                        return BadRequest(new
-                        {
-                            success = false,
-                            message = $"Failed to save config to GitHub: {configResult.Message}",
-                            projectId = projectId,
-                            gitHubRepoUrl = projectInfo.GitHubRepoUrl,
-                            status = (int)DeploymentStatus.Failed
-                        });
-                    }
-
-                    configFileUrl = configResult.FileUrl;
-                    _logger.LogInformation($"✅ Config file saved: {configFileUrl}");
-                }
-                else
-                {
-                    _logger.LogInformation("Skipping config generation for GitHub Pages");
-                }
-
                 DeploymentResponse deploymentResult = request.Platform.ToLower() switch
                 {
-                    "cloudflare" => await DeployToCloudflareWithUserRepo("swiftdeployapp/"+repoName, "main", request.Config, platformToken, _configuration["SwiftDeploy:GitHubToken"]),
+                    "cloudflare" => await _deploymentService.DeployToCloudflareAsync(repoName, "main", request.Config, userId, platformToken),
                     "netlify" => await _deploymentService.DeployToNetlifyAsync(repoName, "main", request.Config, userId, platformToken),
-                    "vercel" => await DeployToVercelWithUserRepo("swiftdeployapp/"+repoName, "main", request.Config, platformToken, _configuration["SwiftDeploy:GitHubToken"]),
+                    "vercel" => await _deploymentService.DeployToVercelAsync(repoName, "main", request.Config, userId, platformToken),
                     _ => throw new ArgumentException($"Unsupported platform: {request.Platform}")
                 };
 
@@ -1117,7 +1072,7 @@ namespace SwiftDeploy.Controllers
                     subdomainProp.ValueKind != JsonValueKind.Null)
                 {
                     subdomain = subdomainProp.GetString();
-                    deploymentUrl = $"https://{subdomain}";
+                    deploymentUrl = $"https://{subdomain}.pages.dev";
                 }
 
                 // ⭐ Extract project ID (Cloudflare uses project name as ID)
@@ -1179,6 +1134,7 @@ namespace SwiftDeploy.Controllers
                                     {
                                         specificDeploymentUrl = $"https://{specificDeploymentUrl}";
                                     }
+                                    deploymentUrl = specificDeploymentUrl;
                                     _logger.LogInformation($"✅ Updated deployment URL from deployment response: {deploymentUrl}");
                                 }
                             }
@@ -1909,7 +1865,7 @@ namespace SwiftDeploy.Controllers
                 });
             }
         }
-        // ⭐ Direct deletion using platform project ID
+        // ⭐ Direct deletion using platform project IDh
         private async Task<DeploymentResponse> DeleteVercelProjectById(string vercelProjectId, string vercelToken)
         {
             try
