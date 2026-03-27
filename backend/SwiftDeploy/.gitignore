@@ -55,3 +55,4 @@ project.fragment.lock.json
 *.orig
 _ReSharper*/
 *.DotSettings.user
+appsettings.json
