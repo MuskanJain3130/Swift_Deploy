@@ -9,6 +9,7 @@ using SwiftDeploy.Services;
 using SwiftDeploy.Services.Interfaces;
 using System.Linq;
 using System.Security.Claims;
+using System.Text.Json;
 using System.Threading.Tasks;
 
 namespace SwiftDeploy.Controllers
@@ -21,11 +22,13 @@ namespace SwiftDeploy.Controllers
         private readonly MongoDbService _mongo;
         //private readonly ILoggingService _loggingService;
 
-        public RepositoriesController(MongoDbService mongo)
+        private readonly LLMService _llmService;
+
+        public RepositoriesController(MongoDbService mongo, LLMService llmService)
         {
             _githubClient = new GitHubClient(new ProductHeaderValue("SwiftDeployApp"));
             _mongo = mongo;
-            //_loggingService = loggingService;
+            _llmService = llmService;
         }
 
         /// <summary>
@@ -256,10 +259,9 @@ namespace SwiftDeploy.Controllers
         {
             Console.WriteLine("=== Analyze and Suggest Endpoint Called ===");
 
-            // Authenticate current user and obtain the stored GitHub token
-            if (!TryAuthenticate(out var error)) return Unauthorized(error);
+            if (!TryAuthenticate(out var error))
+                return Unauthorized(error);
 
-            // Validate request body
             if (request == null || string.IsNullOrEmpty(request.Owner) || string.IsNullOrEmpty(request.RepoName))
             {
                 return BadRequest(new
@@ -271,34 +273,28 @@ namespace SwiftDeploy.Controllers
 
             try
             {
-                // GitHub token is already set on _githubClient by TryAuthenticate,
-                // but ensure credentials are set explicitly using the token returned
-
                 Console.WriteLine($"=== Analyzing Repository ===");
                 Console.WriteLine($"Owner: {request.Owner}");
                 Console.WriteLine($"Repo: {request.RepoName}");
                 Console.WriteLine($"Branch: {request.Branch ?? "main"}");
-                //Console.WriteLine($"Token Length: {githubToken?.Length ?? 0}");
-                //Console.WriteLine($"Token Prefix: {(githubToken != null ? githubToken.Substring(0, System.Math.Min(7, githubToken.Length)) + "..." : "NULL")}");
 
-                // Test GitHub authentication first
+                // ✅ Test GitHub authentication
                 try
                 {
                     var user = await _githubClient.User.Current();
                     Console.WriteLine($"Authenticated as: {user.Login}");
                 }
-                catch (System.Exception authEx)
+                catch (Exception authEx)
                 {
-                    Console.WriteLine($"Authentication test failed: {authEx.Message}");
                     return Unauthorized(new
                     {
                         success = false,
-                        error = "GitHub authentication failed. Token may be invalid or expired.",
+                        error = "GitHub authentication failed",
                         details = authEx.Message
                     });
                 }
 
-                // Perform analysis
+                // ✅ Analyze repository
                 var analyzer = new RepositoryAnalyzerService(_githubClient);
                 var analysis = await analyzer.AnalyzeRepository(
                     request.Owner,
@@ -306,10 +302,114 @@ namespace SwiftDeploy.Controllers
                     request.Branch ?? "main"
                 );
 
-                Console.WriteLine($"Analysis completed successfully");
-                Console.WriteLine($"Framework detected: {analysis.Framework ?? "Unknown"}");
-                Console.WriteLine($"Recommended platform: {analysis.RecommendedPlatform?.Platform ?? "None"}");
+                // ✅ Improved prompt
+                var prompt = $@"
+You are a senior DevOps architect.
 
+Analyze the project and provide:
+
+1. Best deployment platform
+2. Score for each platform
+3. Possible build failures
+4. Optimization suggestions
+
+Project:
+Language: {analysis.Language}
+Frontend: {analysis.Framework}
+Backend: {analysis.BackendFramework}
+Build Tool: {analysis.BuildTool}
+Package Manager: {analysis.PackageManager}
+
+Features:
+Static: {analysis.IsStatic}
+SSR: {analysis.HasServerSideRendering}
+API: {analysis.HasApiRoutes}
+Database: {analysis.HasDatabase}
+Docker: {analysis.HasDocker}
+Technologies: {string.Join(", ", analysis.DetectedTechnologies ?? new List<string>())}
+
+Platforms:
+- Vercel
+- Netlify
+- Cloudflare Pages
+- GitHub Pages
+
+Rules:
+- SSR → Vercel preferred
+- Static → Netlify/Cloudflare preferred
+- API/Backend → avoid GitHub Pages
+
+Return ONLY JSON:
+{{
+  ""recommendation"": ""string"",
+  ""suggestions"": [
+    {{
+      ""platform"": ""string"",
+      ""score"": number,
+      ""reason"": ""string""
+    }}
+  ],
+  ""buildRisks"": [
+    ""string""
+  ],
+  ""optimizations"": [
+    ""string""
+  ]
+}}";
+
+                // ✅ Call LLM
+                var llmRaw = await _llmService.GetPlatformSuggestion(prompt);
+
+                Console.WriteLine("=== LLM RAW RESPONSE ===");
+                Console.WriteLine(llmRaw);
+
+                // ✅ SAFE PARSING (FIXED)
+                string content = null;
+
+                using (var jsonDoc = JsonDocument.Parse(llmRaw))
+                {
+                    var root = jsonDoc.RootElement;
+
+                    // Case 1: OpenAI format
+                    if (root.TryGetProperty("choices", out var choices))
+                    {
+                        content = choices[0]
+                            .GetProperty("message")
+                            .GetProperty("content")
+                            .GetString();
+                    }
+                    else
+                    {
+                        // Case 2: Direct JSON
+                        content = llmRaw;
+                    }
+                }
+
+                // ✅ Extract clean JSON
+                var cleanJson = ExtractJson(content);
+
+                Console.WriteLine("=== CLEAN JSON ===");
+                Console.WriteLine(cleanJson);
+
+                var options = new JsonSerializerOptions
+                {
+                    PropertyNameCaseInsensitive = true
+                };
+
+                var llmResult = JsonSerializer.Deserialize<LLMResult>(cleanJson, options);
+
+                if (llmResult == null || llmResult.Suggestions == null)
+                {
+                    return StatusCode(500, new
+                    {
+                        success = false,
+                        error = "LLM parsing failed"
+                    });
+                }
+
+                Console.WriteLine($"✅ LLM Recommendation: {llmResult.Recommendation}");
+
+                // ✅ FINAL RESPONSE (LLM BASED)
                 return Ok(new
                 {
                     success = true,
@@ -331,69 +431,56 @@ namespace SwiftDeploy.Controllers
                         {
                             buildTool = analysis.BuildTool ?? "None",
                             packageManager = analysis.PackageManager ?? "None",
-                            technologies = analysis.DetectedTechnologies,
                             isStatic = analysis.IsStatic,
                             hasSSR = analysis.HasServerSideRendering,
-                            hasEdgeFunctions = analysis.HasEdgeFunctions,
                             hasApiRoutes = analysis.HasApiRoutes,
                             hasDatabase = analysis.HasDatabase,
                             hasDocker = analysis.HasDocker
                         },
-                        recommendedPlatform = analysis.RecommendedPlatform,
-                        allSuggestions = analysis.Suggestions.Select(s => new
+
+                        // ⭐ EXISTING
+                        recommendedPlatform = llmResult.Recommendation,
+
+                        allSuggestions = llmResult.Suggestions.Select(s => new
                         {
-                            platform = s.Platform,
-                            score = s.Score,
-                            reason = s.Reason,
-                            features = s.DetectedFeatures,
-                            isRecommended = s.IsRecommended
-                        })
+                            platform = s.platform,
+                            score = s.score,
+                            reason = s.reason,
+                            isRecommended = s.platform == llmResult.Recommendation
+                        }),
+
+                        // ⭐ NEW FEATURES
+                        buildRisks = llmResult.buildRisks ?? new List<string>(),
+
+                        optimizations = llmResult.optimizations ?? new List<string>()
                     }
                 });
             }
+            catch (Exception ex)
+            {
+                Console.WriteLine($"❌ ERROR: {ex.Message}");
+                Console.WriteLine($"STACK: {ex.StackTrace}");
 
-            catch (AuthorizationException ex)
-            {
-                Console.WriteLine($"GitHub authorization failed: {ex.Message}");
-                return Unauthorized(new
-                {
-                    success = false,
-                    error = "GitHub authorization failed. Please check your GitHub token.",
-                    details = ex.Message
-                });
-            }
-            catch (NotFoundException ex)
-            {
-                Console.WriteLine($"Repository not found: {ex.Message}");
-                return NotFound(new
-                {
-                    success = false,
-                    error = $"Repository '{request.Owner}/{request.RepoName}' not found or you do not have access.",
-                    details = ex.Message
-                });
-            }
-            catch (RateLimitExceededException ex)
-            {
-                Console.WriteLine($"GitHub rate limit exceeded: {ex.Message}");
-                return StatusCode(429, new
-                {
-                    success = false,
-                    error = "GitHub API rate limit exceeded. Please try again later.",
-                    details = ex.Message
-                });
-            }
-            catch (System.Exception ex)
-            {
-                Console.WriteLine($"Error analyzing repository: {ex.Message}");
-                Console.WriteLine($"Stack trace: {ex.StackTrace}");
                 return StatusCode(500, new
                 {
                     success = false,
                     error = "An error occurred while analyzing the repository.",
-                    details = ex.Message,
-                    stackTrace = ex.StackTrace
+                    details = ex.Message
                 });
             }
+        }
+        private string ExtractJson(string text)
+        {
+            if (string.IsNullOrEmpty(text))
+                return text;
+
+            var start = text.IndexOf("{");
+            var end = text.LastIndexOf("}");
+
+            if (start >= 0 && end >= 0 && end > start)
+                return text.Substring(start, end - start + 1);
+
+            return text;
         }
     }
 }
