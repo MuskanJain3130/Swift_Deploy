@@ -5,10 +5,13 @@ using DeploymentStatus = SwiftDeploy.Models.DeploymentStatus;
 
         public interface IUnifiedDeploymentService
         {
-            Task<string> UploadAndExtractProjectAsync(IFormFile zipFile, string projectName);
+    Task<DeploymentResponse> ExecuteUploadDeployment(UploadProjectRequest request, string userId);
+
+    Task<string> UploadAndExtractProjectAsync(string zipFile, string projectName);
             Task<string> CreateSwiftDeployRepoAsync(string projectName, string description = null);
             Task<bool> PushCodeToSwiftDeployRepoAsync(string repoName, string localProjectPath);
-            Task<bool> PushConfigToRepoAsync(string repoName, string platform, CommonConfig config);
+    Task<DeploymentResponse> ExecuteGitHubDeployment(GitHubDeployRequest request);
+    Task<bool> PushConfigToRepoAsync(string repoName, string platform, CommonConfig config);
 
             // Update these to accept userId and platformToken
             Task<DeploymentResponse> DeployToCloudflareAsync(string repoName, string branch, CommonConfig config, string userId, string platformToken);

@@ -16,7 +16,7 @@ namespace SwiftDeploy.Models
         public string Platform { get; set; }
 
         [Required]
-        public IFormFile ProjectZip { get; set; }
+        public String ZipPath { get; set; }
 
         [Required]
         public CommonConfig Config { get; set; }

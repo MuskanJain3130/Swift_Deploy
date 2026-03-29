@@ -26,6 +26,7 @@ builder.Services.AddScoped<IUnifiedDeploymentService, UnifiedDeploymentService>(
 builder.Services.AddScoped<TokenService>();
 // Authentication registration (fixed: single AddAuthentication with chained handlers)
 //builder.Services.AddScoped<ILoggingService, LoggingService>();
+builder.Services.AddHostedService<DeploymentSchedulerWorker>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;

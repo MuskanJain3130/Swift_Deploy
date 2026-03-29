@@ -1,6 +1,8 @@
 ﻿// Controllers/UnifiedDeploymentController.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
+using MongoDB.Driver;
 using Octokit;
 using SwiftDeploy.Models;
 using SwiftDeploy.Services;
@@ -17,6 +19,7 @@ namespace SwiftDeploy.Controllers
     [Authorize]
     public class UnifiedDeploymentController : ControllerBase
     {
+        private readonly IMongoCollection<ScheduledDeployment> _scheduledCollection;
         private readonly IUnifiedDeploymentService _deploymentService;
         private readonly ITemplateEngine _templateEngine;
         private readonly ILogger<UnifiedDeploymentController> _logger;
@@ -33,14 +36,16 @@ namespace SwiftDeploy.Controllers
             IConfiguration configuration,
             TokenService tokenService,
             ILogger<UnifiedDeploymentController> logger,
-                IHttpContextAccessor httpContextAccessor // ADD THIS
+                IHttpContextAccessor httpContextAccessor , IMongoDatabase db// ADD THIS
 )
         {
             _deploymentService = deploymentService;
             _templateEngine = templateEngine;
             _configuration = configuration;
             _tokenService = tokenService;
-            _logger = logger;
+            _logger = logger; 
+            _scheduledCollection = db.GetCollection<ScheduledDeployment>("scheduled_deployments");
+
             _httpContextAccessor = httpContextAccessor;
         }
 
@@ -84,7 +89,7 @@ namespace SwiftDeploy.Controllers
 
                 // Step 1: Upload and extract project
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Processing, "Extracting project files...");
-                var localProjectPath = await _deploymentService.UploadAndExtractProjectAsync(request.ProjectZip, request.ProjectName);
+                var localProjectPath = await _deploymentService.UploadAndExtractProjectAsync(request.ZipPath, request.ProjectName);
 
                 // Step 2: Create GitHub repo on SwiftDeploy account
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.CreatingRepo, "Creating GitHub repository...");
@@ -220,7 +225,123 @@ namespace SwiftDeploy.Controllers
                 _ => "Unknown"
             };
         }
-        [HttpPost("deploy-with-github")]
+        private string ExtractPlatform(object payload)
+        {
+            var json = JsonSerializer.Serialize(payload);
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("platform", out var platform))
+                return platform.GetString();
+
+            return "unknown";
+        }
+            [HttpPost("schedule-upload")]
+            public async Task<IActionResult> ScheduleUploadDeployment(
+        [FromBody] UploadProjectRequest request,
+        [FromQuery] DateTime scheduledTime)
+            {
+                try
+                {
+                    var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                    if (string.IsNullOrEmpty(userId))
+                        return Unauthorized("Invalid user");
+
+                    if (request == null)
+                        return BadRequest("Invalid request payload");
+
+                    if (string.IsNullOrEmpty(request.ZipPath))
+                        return BadRequest("ZipPath is required for scheduled deployments");
+
+                    if (scheduledTime <= DateTime.UtcNow)
+                        return BadRequest("Scheduled time must be in the future");
+
+                    var scheduled = new ScheduledDeployment
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        ProjectId = Guid.NewGuid().ToString(),
+                        UserId = userId,
+                        DeploymentType = "upload",
+                        Platform = request.Platform?.ToLower(),
+                        ScheduledTime = scheduledTime,
+                        PayloadJson = JsonSerializer.Serialize(request),
+                        Status = "Pending",
+                        IsExecuted = false,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _scheduledCollection.InsertOneAsync(scheduled);
+
+                    _logger.LogInformation($"📅 Upload deployment scheduled: {scheduled.Id}");
+
+                    return Ok(new
+                    {
+                        message = "Upload deployment scheduled successfully",
+                        scheduleId = scheduled.Id,
+                        scheduledTime = scheduledTime
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error scheduling upload deployment");
+                    return StatusCode(500, "Error scheduling deployment");
+                }
+            }
+
+            [HttpPost("schedule-github")]
+            public async Task<IActionResult> ScheduleGitHubDeployment(
+             [FromBody] GitHubDeployRequest request,
+             [FromQuery] DateTime scheduledTime)
+            {
+                try
+                {
+                    var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                    if (string.IsNullOrEmpty(userId))
+                        return Unauthorized("Invalid user");
+
+                    if (request == null)
+                        return BadRequest("Invalid request payload");
+
+                    if (string.IsNullOrEmpty(request.GitHubRepo))
+                        return BadRequest("GitHub repository is required");
+
+                    if (scheduledTime <= DateTime.UtcNow)
+                        return BadRequest("Scheduled time must be in the future");
+
+                    var scheduled = new ScheduledDeployment
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        ProjectId = Guid.NewGuid().ToString(),
+                        UserId = userId,
+                        DeploymentType = "github",
+                        Platform = request.Platform?.ToLower(),
+                        ScheduledTime = scheduledTime,
+                        PayloadJson = JsonSerializer.Serialize(request),
+                        Status = "Pending",
+                        IsExecuted = false,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _scheduledCollection.InsertOneAsync(scheduled);
+
+                    _logger.LogInformation($"📅 GitHub deployment scheduled: {scheduled.Id}");
+
+                    return Ok(new
+                    {
+                        message = "GitHub deployment scheduled successfully",
+                        scheduleId = scheduled.Id,
+                        scheduledTime = scheduledTime
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error scheduling GitHub deployment");
+                    return StatusCode(500, "Error scheduling deployment");
+                }
+            }
+
+            [HttpPost("deploy-with-github")]
         public async Task<IActionResult> DeployWithGitHub([FromBody] GitHubDeployRequest request)
         {
             var projectId = Guid.NewGuid().ToString();
