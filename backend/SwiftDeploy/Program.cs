@@ -27,6 +27,7 @@ builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<LLMService>();
 // Authentication registration (fixed: single AddAuthentication with chained handlers)
 //builder.Services.AddScoped<ILoggingService, LoggingService>();
+builder.Services.AddHostedService<DeploymentSchedulerWorker>();
 builder.Services.AddAuthentication(options =>
 {
     options.DefaultAuthenticateScheme = JwtBearerDefaults.AuthenticationScheme;
