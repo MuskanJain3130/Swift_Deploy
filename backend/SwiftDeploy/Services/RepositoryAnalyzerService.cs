@@ -914,7 +914,7 @@ namespace SwiftDeploy.Services
 
         private (int Score, string Reason, List<string> Features) CalculateVercelScore(RepositoryAnalysis analysis)
         {
-            int score = 50; // Base score
+            int score = 70; // Base score
             var features = new List<string>();
             var reasons = new List<string>();
 
@@ -970,7 +970,7 @@ namespace SwiftDeploy.Services
 
         private (int Score, string Reason, List<string> Features) CalculateNetlifyScore(RepositoryAnalysis analysis)
         {
-            int score = 50;
+            int score = 20;
             var features = new List<string>();
             var reasons = new List<string>();
 

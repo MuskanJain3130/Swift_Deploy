@@ -1,6 +1,8 @@
 ﻿// Services/UnifiedDeploymentService.cs
+using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Http;
 using MongoDB.Driver;
+using Azure.Storage.Blobs;
 using Octokit;
 using SwiftDeploy.Models;
 using SwiftDeploy.Models.SwiftDeploy.Models;
@@ -24,11 +26,11 @@ namespace SwiftDeploy.Services.Interfaces
         private static readonly Dictionary<string, ProjectInfo> _projectStatuses = new();
 
         public UnifiedDeploymentService(
-            IConfiguration configuration,
-            ITemplateEngine templateEngine,
-            ILogger<UnifiedDeploymentService> logger,
-            MongoDbService mongoDbService,
-            IHttpContextAccessor httpContextAccessor)
+        IConfiguration configuration,
+        ITemplateEngine templateEngine,
+        ILogger<UnifiedDeploymentService> logger,
+        MongoDbService mongoDbService,
+        IHttpContextAccessor httpContextAccessor)
         {
             _configuration = configuration;
             _templateEngine = templateEngine;
@@ -39,128 +41,23 @@ namespace SwiftDeploy.Services.Interfaces
             // Initialize GitHub client with SwiftDeploy token
             var swiftDeployToken = _configuration["SwiftDeploy:GitHubToken"];
 
-            if (!string.IsNullOrEmpty(swiftDeployToken))
+            if (string.IsNullOrEmpty(swiftDeployToken))
             {
-                _gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
-                {
-                    Credentials = new Credentials(swiftDeployToken)
-                };
-                _logger.LogInformation("GitHub client initialized with SwiftDeploy token");
+                _logger.LogError("❌ SwiftDeploy GitHub token is missing in configuration!");
+                throw new Exception("SwiftDeploy:GitHubToken is not configured in appsettings.json");
             }
-            else
+
+            _gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
             {
-                // Initialize without credentials - will use user tokens per request
-                _gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"));
-                _logger.LogWarning("GitHub client initialized without credentials. Will use user tokens for operations.");
-            }
+                Credentials = new Credentials(swiftDeployToken)
+            };
+
+            _logger.LogInformation("✅ GitHub client initialized with SwiftDeploy token");
         }
-        public async Task<string> UploadAndExtractProjectAsync(string zipPath, string projectName)
-        {
-            try
-            {
-                if (!File.Exists(zipPath))
-                    throw new Exception($"Zip not found at {zipPath}");
 
-                var tempDir = Path.Combine(Path.GetTempPath(), "swiftdeploy", Guid.NewGuid().ToString());
-                Directory.CreateDirectory(tempDir);
 
-                var extractDir = Path.Combine(tempDir, "extracted");
-                Directory.CreateDirectory(extractDir);
-                ZipFile.ExtractToDirectory(zipPath, extractDir);
 
-                _logger.LogInformation($"Extracted {projectName} from {zipPath}");
-
-                return extractDir;
-            }
-            catch (Exception ex)
-            {
-                _logger.LogError(ex, "Extraction failed");
-                throw;
-            }
-        }
-        public async Task<DeploymentResponse> ExecuteGitHubDeployment(GitHubDeployRequest request)
-        {
-            try
-            {
-                var githubToken = await GetUserGitHubTokenAsync(request.UserId);
-
-                if (string.IsNullOrEmpty(githubToken))
-                    throw new Exception("GitHub token missing");
-
-                string platformToken = null;
-
-                if (request.Platform.ToLower() != "githubpages")
-                {
-                    platformToken = await GetPlatformTokenAsync(request.UserId, request.Platform);
-                }
-
-                return request.Platform.ToLower() switch
-                {
-                    "vercel" => await DeployToVercelWithUserRepo(
-                        request.GitHubRepo,
-                        request.Branch,
-                        request.Config,
-                        platformToken,
-                        githubToken
-                    ),
-                    "netlify" => await DeployToNetlifyWithUserRepo(
-                    request.GitHubRepo,
-                    request.Branch,
-                    request.Config,
-                    platformToken,
-                    githubToken
-                ),
-
-                    "cloudflare" => await DeployToCloudflareWithUserRepo(
-                        request.GitHubRepo,
-                        request.Branch,
-                        request.Config,
-                        platformToken,
-                        githubToken
-                    ),
-                    _ => throw new Exception("Unsupported platform")
-                };
-            }
-            catch (Exception ex)
-            {
-                return new DeploymentResponse
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
-            }
-        }
-        public async Task<DeploymentResponse> ExecuteUploadDeployment(UploadProjectRequest request, string userId)
-        {
-            try
-            {
-                var repoName = await CreateSwiftDeployRepoAsync(
-                    request.ProjectName,
-                    request.Description ?? $"Project: {request.ProjectName}"
-                );
-
-                var localPath = await UploadAndExtractProjectAsync(request.ZipPath, request.ProjectName);
-
-                await PushCodeToSwiftDeployRepoAsync(repoName, localPath);
-                await PushConfigToRepoAsync(repoName, request.Platform, request.Config);
-
-                return request.Platform.ToLower() switch
-                {
-                    "cloudflare" => await DeployToCloudflareAsync(repoName, "main", request.Config, userId),
-                    "netlify" => await DeployToNetlifyAsync(repoName, "main", request.Config, userId),
-                    "vercel" => await DeployToVercelAsync(repoName, "main", request.Config, userId),
-                    _ => throw new Exception("Unsupported platform")
-                };
-            }
-            catch (Exception ex)
-            {
-                return new DeploymentResponse
-                {
-                    Success = false,
-                    Message = ex.Message
-                };
-            }
-        }
+        // ⭐ Helper: Get user's GitHub token from header OR database
         private async Task<string?> GetUserGitHubTokenAsync(string userId)
         {
             try
@@ -325,7 +222,8 @@ namespace SwiftDeploy.Services.Interfaces
         {
             try
             {
-                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeploy-repos";
+                //var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeployapp";
+                var orgName = (await _gitHubClient.User.Current()).Login;
                 var repoName = GenerateRepoName(projectName);
 
                 var newRepo = new NewRepository(repoName)
@@ -336,7 +234,7 @@ namespace SwiftDeploy.Services.Interfaces
                 };
 
                 // Create repo in organization
-                var repo = await _gitHubClient.Repository.Create(orgName, newRepo);
+                var repo = await _gitHubClient.Repository.Create(newRepo);
 
                 _logger.LogInformation($"Created GitHub repo: {repo.FullName}");
                 return repo.Name;
@@ -347,19 +245,58 @@ namespace SwiftDeploy.Services.Interfaces
                 throw;
             }
         }
+        private string GetActualProjectRoot(string extractedPath)
+        {
+            try
+            {
+                var dirs = Directory.GetDirectories(extractedPath);
+                var files = Directory.GetFiles(extractedPath);
+
+                // If only 1 subdirectory and no files in root, dive into that directory
+                if (dirs.Length == 1 && files.Length == 0)
+                {
+                    var singleSubDir = dirs[0];
+                    _logger.LogInformation($"Found single wrapper directory: {singleSubDir}, diving in...");
+
+                    // Recursively check if we need to go deeper
+                    return GetActualProjectRoot(singleSubDir);
+                }
+
+                // Otherwise, this is the actual project root
+                _logger.LogInformation($"Actual project root: {extractedPath}");
+                return extractedPath;
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Error determining project root");
+                return extractedPath; // Fallback to original path
+            }
+        }
 
         public async Task<bool> PushCodeToSwiftDeployRepoAsync(string repoName, string localProjectPath)
         {
             try
             {
-                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeploy-repos";
+                //var swiftDeployToken = _configuration["SwiftDeploy:GitHubToken"];
 
-                // Get all files from local project
-                var files = Directory.GetFiles(localProjectPath, "*", SearchOption.AllDirectories);
+                //_gitHubClient = new GitHubClient(new ProductHeaderValue("SwiftDeploy"))
+                //{
+                //    Credentials = new Credentials(swiftDeployToken)
+                //};
+                var orgName = (await _gitHubClient.User.Current()).Login;
+
+                // ⭐ FIX: Find the actual project root (skip empty wrapper directories)
+                var projectRoot = GetActualProjectRoot(localProjectPath);
+
+                _logger.LogInformation($"Pushing code from {projectRoot} to {orgName}/{repoName}");
+
+                // Get all files from the actual project root
+                var files = Directory.GetFiles(projectRoot, "*", SearchOption.AllDirectories);
 
                 foreach (var filePath in files)
                 {
-                    var relativePath = Path.GetRelativePath(localProjectPath, filePath);
+                    // ⭐ Calculate relative path from the ACTUAL project root
+                    var relativePath = Path.GetRelativePath(projectRoot, filePath);
                     var content = await File.ReadAllTextAsync(filePath);
 
                     try
@@ -370,12 +307,16 @@ namespace SwiftDeploy.Services.Interfaces
                         // Update existing file
                         var updateRequest = new UpdateFileRequest($"Update {relativePath}", content, existingFile[0].Sha);
                         await _gitHubClient.Repository.Content.UpdateFile(orgName, repoName, relativePath, updateRequest);
+
+                        _logger.LogInformation($"Updated file: {relativePath}");
                     }
                     catch (NotFoundException)
                     {
                         // Create new file
                         var createRequest = new CreateFileRequest($"Add {relativePath}", content);
                         await _gitHubClient.Repository.Content.CreateFile(orgName, repoName, relativePath, createRequest);
+
+                        _logger.LogInformation($"Created file: {relativePath}");
                     }
                 }
 
@@ -393,7 +334,8 @@ namespace SwiftDeploy.Services.Interfaces
         {
             try
             {
-                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeploy-repos";
+
+                var orgName = (await _gitHubClient.User.Current()).Login;
 
                 // Generate config content
                 var configContent = await _templateEngine.GenerateConfigAsync(platform, config);
@@ -595,7 +537,7 @@ namespace SwiftDeploy.Services.Interfaces
                 using var client = new HttpClient();
                 client.DefaultRequestHeaders.Authorization = new System.Net.Http.Headers.AuthenticationHeaderValue("Bearer", platformToken);
 
-                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeploy-repos";
+                var orgName = _configuration["SwiftDeploy:GitHubOrg"] ?? "swiftdeployapp";
 
                 var payload = new
                 {
@@ -710,9 +652,79 @@ namespace SwiftDeploy.Services.Interfaces
             var hex = BitConverter.ToString(hash).Replace("-", "").ToLower();
             return $"swiftdeploy-{hex.Substring(0, 10)}";
         }
+        public async Task<string> DownloadAndExtractFromAzureAsync(string blobName, string projectName)
+    {
+        try
+        {
+            var connectionString = _configuration["Azure:ConnectionString"];
+            var containerName = _configuration["Azure:ContainerName"];
 
-        // ⭐ Public method to get GitHub token (for use in controllers)
-        public async Task<string?> GetGitHubTokenForUserAsync(string userId)
+            if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(containerName))
+                throw new Exception("Azure storage configuration missing (Azure:ConnectionString or Azure:ContainerName).");
+
+            // Create temp directory for download and extraction
+            var tempDir = Path.Combine(Path.GetTempPath(), "swiftdeploy", Guid.NewGuid().ToString());
+            Directory.CreateDirectory(tempDir);
+
+            var localZipPath = Path.Combine(tempDir, blobName);
+            var extractDir = Path.Combine(tempDir, "extracted");
+
+            try
+            {
+                // Download blob to local file
+                var blobServiceClient = new BlobServiceClient(connectionString);
+                var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+                var blobClient = containerClient.GetBlobClient(blobName);
+
+                var exists = await blobClient.ExistsAsync();
+                if (!exists.Value)
+                {
+                    throw new FileNotFoundException($"Blob '{blobName}' not found in container '{containerName}'.");
+                }
+
+                _logger.LogInformation($"Downloading blob {blobName} from Azure...");
+                await blobClient.DownloadToAsync(localZipPath);
+
+                // Extract ZIP file
+                Directory.CreateDirectory(extractDir);
+                _logger.LogInformation($"Extracting {blobName} to {extractDir}...");
+                ZipFile.ExtractToDirectory(localZipPath, extractDir);
+
+                // ⭐ Delete blob from Azure after successful download
+                _logger.LogInformation($"Deleting blob {blobName} from Azure storage...");
+                await blobClient.DeleteIfExistsAsync();
+
+                // ⭐ Delete local zip file (keep only extracted folder)
+                if (File.Exists(localZipPath))
+                {
+                    File.Delete(localZipPath);
+                    _logger.LogInformation($"Deleted local zip file: {localZipPath}");
+                }
+
+                _logger.LogInformation($"Project {projectName} downloaded and extracted from Azure to {extractDir}");
+                return extractDir;
+            }
+            catch (InvalidDataException ide)
+            {
+                _logger.LogError(ide, $"Failed to extract zip file: {localZipPath}");
+
+                // Cleanup on failure
+                if (File.Exists(localZipPath))
+                    File.Delete(localZipPath);
+                if (Directory.Exists(extractDir))
+                    Directory.Delete(extractDir, true);
+
+                throw new Exception("The downloaded file is not a valid zip archive.");
+            }
+        }
+        catch (Exception ex)
+        {
+            _logger.LogError(ex, $"Error downloading and extracting from Azure for project {projectName}");
+            throw;
+        }
+    }
+    // ⭐ Public method to get GitHub token (for use in controllers)
+    public async Task<string?> GetGitHubTokenForUserAsync(string userId)
         {
             return await GetUserGitHubTokenAsync(userId);
         }
