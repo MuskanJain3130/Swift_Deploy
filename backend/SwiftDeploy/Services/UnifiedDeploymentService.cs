@@ -653,78 +653,78 @@ namespace SwiftDeploy.Services.Interfaces
             return $"swiftdeploy-{hex.Substring(0, 10)}";
         }
         public async Task<string> DownloadAndExtractFromAzureAsync(string blobName, string projectName)
-    {
-        try
         {
-            var connectionString = _configuration["Azure:ConnectionString"];
-            var containerName = _configuration["Azure:ContainerName"];
-
-            if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(containerName))
-                throw new Exception("Azure storage configuration missing (Azure:ConnectionString or Azure:ContainerName).");
-
-            // Create temp directory for download and extraction
-            var tempDir = Path.Combine(Path.GetTempPath(), "swiftdeploy", Guid.NewGuid().ToString());
-            Directory.CreateDirectory(tempDir);
-
-            var localZipPath = Path.Combine(tempDir, blobName);
-            var extractDir = Path.Combine(tempDir, "extracted");
-
             try
             {
-                // Download blob to local file
-                var blobServiceClient = new BlobServiceClient(connectionString);
-                var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
-                var blobClient = containerClient.GetBlobClient(blobName);
+                var connectionString = _configuration["Azure:ConnectionString"];
+                var containerName = _configuration["Azure:ContainerName"];
 
-                var exists = await blobClient.ExistsAsync();
-                if (!exists.Value)
+                if (string.IsNullOrWhiteSpace(connectionString) || string.IsNullOrWhiteSpace(containerName))
+                    throw new Exception("Azure storage configuration missing (Azure:ConnectionString or Azure:ContainerName).");
+
+                // Create temp directory for download and extraction
+                var tempDir = Path.Combine(Path.GetTempPath(), "swiftdeploy", Guid.NewGuid().ToString());
+                Directory.CreateDirectory(tempDir);
+
+                var localZipPath = Path.Combine(tempDir, blobName);
+                var extractDir = Path.Combine(tempDir, "extracted");
+
+                try
                 {
-                    throw new FileNotFoundException($"Blob '{blobName}' not found in container '{containerName}'.");
+                    // Download blob to local file
+                    var blobServiceClient = new BlobServiceClient(connectionString);
+                    var containerClient = blobServiceClient.GetBlobContainerClient(containerName);
+                    var blobClient = containerClient.GetBlobClient(blobName);
+
+                    var exists = await blobClient.ExistsAsync();
+                    if (!exists.Value)
+                    {
+                        throw new FileNotFoundException($"Blob '{blobName}' not found in container '{containerName}'.");
+                    }
+
+                    _logger.LogInformation($"Downloading blob {blobName} from Azure...");
+                    await blobClient.DownloadToAsync(localZipPath);
+
+                    // Extract ZIP file
+                    Directory.CreateDirectory(extractDir);
+                    _logger.LogInformation($"Extracting {blobName} to {extractDir}...");
+                    ZipFile.ExtractToDirectory(localZipPath, extractDir);
+
+                    // ⭐ Delete blob from Azure after successful download
+                    _logger.LogInformation($"Deleting blob {blobName} from Azure storage...");
+                    await blobClient.DeleteIfExistsAsync();
+
+                    // ⭐ Delete local zip file (keep only extracted folder)
+                    if (File.Exists(localZipPath))
+                    {
+                        File.Delete(localZipPath);
+                        _logger.LogInformation($"Deleted local zip file: {localZipPath}");
+                    }
+
+                    _logger.LogInformation($"Project {projectName} downloaded and extracted from Azure to {extractDir}");
+                    return extractDir;
                 }
-
-                _logger.LogInformation($"Downloading blob {blobName} from Azure...");
-                await blobClient.DownloadToAsync(localZipPath);
-
-                // Extract ZIP file
-                Directory.CreateDirectory(extractDir);
-                _logger.LogInformation($"Extracting {blobName} to {extractDir}...");
-                ZipFile.ExtractToDirectory(localZipPath, extractDir);
-
-                // ⭐ Delete blob from Azure after successful download
-                _logger.LogInformation($"Deleting blob {blobName} from Azure storage...");
-                await blobClient.DeleteIfExistsAsync();
-
-                // ⭐ Delete local zip file (keep only extracted folder)
-                if (File.Exists(localZipPath))
+                catch (InvalidDataException ide)
                 {
-                    File.Delete(localZipPath);
-                    _logger.LogInformation($"Deleted local zip file: {localZipPath}");
-                }
+                    _logger.LogError(ide, $"Failed to extract zip file: {localZipPath}");
 
-                _logger.LogInformation($"Project {projectName} downloaded and extracted from Azure to {extractDir}");
-                return extractDir;
+                    // Cleanup on failure
+                    if (File.Exists(localZipPath))
+                        File.Delete(localZipPath);
+                    if (Directory.Exists(extractDir))
+                        Directory.Delete(extractDir, true);
+
+                    throw new Exception("The downloaded file is not a valid zip archive.");
+                }
             }
-            catch (InvalidDataException ide)
+            catch (Exception ex)
             {
-                _logger.LogError(ide, $"Failed to extract zip file: {localZipPath}");
-
-                // Cleanup on failure
-                if (File.Exists(localZipPath))
-                    File.Delete(localZipPath);
-                if (Directory.Exists(extractDir))
-                    Directory.Delete(extractDir, true);
-
-                throw new Exception("The downloaded file is not a valid zip archive.");
+                _logger.LogError(ex, $"Error downloading and extracting from Azure for project {projectName}");
+                throw;
             }
         }
-        catch (Exception ex)
-        {
-            _logger.LogError(ex, $"Error downloading and extracting from Azure for project {projectName}");
-            throw;
-        }
-    }
-    // ⭐ Public method to get GitHub token (for use in controllers)
-    public async Task<string?> GetGitHubTokenForUserAsync(string userId)
+        // ⭐ Public method to get GitHub token (for use in controllers)
+        public async Task<string?> GetGitHubTokenForUserAsync(string userId)
         {
             return await GetUserGitHubTokenAsync(userId);
         }
@@ -1239,6 +1239,166 @@ namespace SwiftDeploy.Services.Interfaces
                 {
                     Success = false,
                     Message = $"GitHub Pages deployment error: {ex.Message}"
+                };
+            }
+        }
+
+        public async Task<string> UploadAndExtractProjectAsync(string zipFile, string projectName)
+        {
+            // If zipFile is actually a blob name → reuse existing logic
+            return await DownloadAndExtractFromAzureAsync(zipFile, projectName);
+        }
+        public async Task<DeploymentResponse> ExecuteUploadDeployment(
+            UploadProjectRequest request,
+            string userId)
+        {
+            try
+            {
+                _logger.LogInformation("Starting upload deployment for {Project}", request.ProjectName);
+
+                // ⭐ STEP 1: Extract ZIP
+                var tempPath = Path.Combine(Path.GetTempPath(), Guid.NewGuid().ToString());
+                Directory.CreateDirectory(tempPath);
+
+                var zipPath = Path.Combine(tempPath, request.ZipPath);
+
+                using (var stream = new FileStream(zipPath, FileMode.Create))
+                {
+                    await request.ProjectZip.CopyToAsync(stream);
+                }
+
+                var extractPath = Path.Combine(tempPath, "extracted");
+                ZipFile.ExtractToDirectory(zipPath, extractPath);
+
+                var actualProjectPath = GetActualProjectRoot(extractPath);
+
+                // ⭐ STEP 2: Create repo
+                var repoName = await CreateSwiftDeployRepoAsync(request.ProjectName, request.Description);
+
+                // ⭐ STEP 3: Push code
+                var pushed = await PushCodeToSwiftDeployRepoAsync(repoName, actualProjectPath);
+
+                if (!pushed)
+                    throw new Exception("Failed to push code");
+
+                // ⭐ STEP 4: Push config
+                await PushConfigToRepoAsync(repoName, request.Platform, request.Config);
+
+                // ⭐ STEP 5: Get tokens
+                var githubToken = await GetUserGitHubTokenAsync(userId);
+                var platformToken = await GetPlatformTokenAsync(userId, request.Platform);
+
+                if (string.IsNullOrEmpty(githubToken))
+                    throw new Exception("GitHub token missing");
+
+                // ⭐ STEP 6: Deploy
+                return request.Platform.ToLower() switch
+                {
+                    "vercel" => await DeployToVercelWithUserRepo(
+                        $"{(await _gitHubClient.User.Current()).Login}/{repoName}",
+                        "main",
+                        request.Config,
+                        platformToken,
+                        githubToken
+                    ),
+
+                    "netlify" => await DeployToNetlifyWithUserRepo(
+                        $"{(await _gitHubClient.User.Current()).Login}/{repoName}",
+                        "main",
+                        request.Config,
+                        platformToken,
+                        githubToken
+                    ),
+
+                    "cloudflare" => await DeployToCloudflareWithUserRepo(
+                        $"{(await _gitHubClient.User.Current()).Login}/{repoName}",
+                        "main",
+                        request.Config,
+                        platformToken,
+                        githubToken
+                    ),
+
+                    _ => throw new Exception("Unsupported platform")
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "Upload deployment failed");
+
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = ex.Message
+                };
+            }
+        }
+
+
+        public async Task<DeploymentResponse> ExecuteGitHubDeployment(GitHubDeployRequest request)
+        {
+            try
+            {
+                _logger.LogInformation("Starting GitHub deployment for {Repo}", request.GitHubRepo);
+
+                // ⭐ Extract owner/repo
+                var parts = request.GitHubRepo.Split('/');
+                if (parts.Length != 2)
+                    throw new Exception("Invalid GitHub repo format. Expected owner/repo");
+
+                var owner = parts[0];
+                var repoName = parts[1];
+                var branch = string.IsNullOrEmpty(request.Branch) ? "main" : request.Branch;
+
+                // ⭐ Get tokens (IMPORTANT for scheduler)
+                var githubToken = await GetUserGitHubTokenAsync(request.UserId);
+                var platformToken = await GetPlatformTokenAsync(request.UserId, request.Platform);
+
+                if (string.IsNullOrEmpty(githubToken))
+                    throw new Exception("GitHub token not found");
+
+                if (string.IsNullOrEmpty(platformToken))
+                    throw new Exception($"{request.Platform} token not found");
+
+                var repoPath = $"{owner}/{repoName}";
+
+                // ⭐ Use SAME flow as your working APIs
+                return request.Platform.ToLower() switch
+                {
+                    "vercel" => await DeployToVercelWithUserRepo(
+                        repoPath,
+                        branch,
+                        request.Config,
+                        platformToken,
+                        githubToken
+                    ),
+
+                    "netlify" => await DeployToNetlifyWithUserRepo(
+                        repoPath,
+                        branch,
+                        request.Config,
+                        platformToken,
+                        githubToken
+                    ),
+
+                    "cloudflare" => await DeployToCloudflareWithUserRepo(
+                        repoPath,
+                        branch,
+                        request.Config,
+                        platformToken,
+                        githubToken
+                    ),
+
+                    _ => throw new Exception("Unsupported platform")
+                };
+            }
+            catch (Exception ex)
+            {
+                _logger.LogError(ex, "GitHub deployment failed");
+
+                return new DeploymentResponse
+                {
+                    Success = false,
+                    Message = ex.Message
                 };
             }
         }

@@ -15,9 +15,10 @@ namespace SwiftDeploy.Models
         public string Platform { get; set; }
 
         // ⭐ Changed: Now accepts either IFormFile OR Azure blob name
-        //public String ZipPath { get; set; }  // Optional now
+        public String ZipPath { get; set; }  // Optional now
+        public IFormFile ProjectZip { get; set; }  // Optional now
 
-        //public string AzureBlobName { get; set; }  // ⭐ NEW: Azure blob name
+        public string AzureBlobName { get; set; }  // ⭐ NEW: Azure blob name
 
         [Required]
         public CommonConfig Config { get; set; }

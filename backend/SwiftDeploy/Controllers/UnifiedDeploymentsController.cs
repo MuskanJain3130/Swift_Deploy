@@ -29,7 +29,6 @@ namespace SwiftDeploy.Controllers
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly TokenService _tokenService;
         private readonly IMongoCollection<Deployment> _deploymentsCollection;
-
         public UnifiedDeploymentController(
             IUnifiedDeploymentService deploymentService,
             ITemplateEngine templateEngine,
@@ -47,7 +46,7 @@ namespace SwiftDeploy.Controllers
             _scheduledCollection = db.GetCollection<ScheduledDeployment>("scheduled_deployments");
 
             _httpContextAccessor = httpContextAccessor;
-            _deploymentsCollection = mongoDatabase.GetCollection<Deployment>("Deployments");
+            _deploymentsCollection = db.GetCollection<Deployment>("Deployments");
         }
 
         //[HttpPost("deploy-without-github")]
