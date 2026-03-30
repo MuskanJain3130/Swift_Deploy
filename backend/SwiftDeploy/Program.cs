@@ -25,6 +25,8 @@ builder.Services.AddScoped<JwtHelper>();// In Program.cs or Startup.cs
 builder.Services.AddScoped<IUnifiedDeploymentService, UnifiedDeploymentService>();// In Program.cs or Startup.cs
 builder.Services.AddScoped<TokenService>();
 builder.Services.AddScoped<LLMService>();
+builder.Services.AddSignalR();
+
 // Authentication registration (fixed: single AddAuthentication with chained handlers)
 //builder.Services.AddScoped<ILoggingService, LoggingService>();
 builder.Services.AddHostedService<DeploymentSchedulerWorker>();
@@ -220,8 +222,8 @@ builder.Services.AddSingleton<MongoDbService>();
     });
 
     var app = builder.Build();
-
-    app.UseCors(builder =>
+app.MapHub<DeploymentHub>("/deploymentHub");
+app.UseCors(builder =>
         builder.WithOrigins("http://localhost:5173", "https://localhost:5174") // Add https origin for frontend if applicable
                .AllowAnyHeader()
                .AllowAnyMethod()
