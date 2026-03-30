@@ -1,4 +1,4 @@
-﻿// Controllers/UnifiedDeploymentController.cs
+// Controllers/UnifiedDeploymentController.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Bson;
@@ -49,8 +49,8 @@ namespace SwiftDeploy.Controllers
             _scheduledCollection = db.GetCollection<ScheduledDeployment>("scheduled_deployments");
 
             _httpContextAccessor = httpContextAccessor;
-            _deploymentsCollection = mongoDatabase.GetCollection<Deployment>("Deployments");
-            _projectsCollection = mongoDatabase.GetCollection<SwiftDeploy.Models.Project>("Projects");
+            _deploymentsCollection = db.GetCollection<Deployment>("Deployments");
+            _projectsCollection = db.GetCollection<SwiftDeploy.Models.Project>("Projects");
         }
 
         //[HttpPost("deploy-without-github")]
@@ -577,7 +577,8 @@ namespace SwiftDeploy.Controllers
                     var scheduled = new ScheduledDeployment
                     {
                         Id = ObjectId.GenerateNewId().ToString(),
-                        ProjectId = Guid.NewGuid().ToString(),
+                        ProjectId =request.ProjectId,
+                        PlatformProjectId = request.PlatformId,
                         UserId = userId,
                         DeploymentType = "github",
                         Platform = request.Platform?.ToLower(),
@@ -731,8 +732,7 @@ namespace SwiftDeploy.Controllers
                         DeployedAt = DateTime.UtcNow,
                         PlatformProjectId = deploymentResult.PlatformProjectId,
                         PlatformProjectName = deploymentResult.PlatformProjectName,
-
-                        InternalProjectId = projectId   // ✅ FIXED (NO GUID)
+                        InternalProjectId = request.ProjectId   // ✅ FIXED (NO GUID)
                     };
 
                     await _deploymentsCollection.InsertOneAsync(mongoDeployment);
@@ -2839,7 +2839,7 @@ namespace SwiftDeploy.Controllers
                 }
             }
 
-            // If ProjectId was stored as Netlify site ID
+            // If ProjectId was stored as Netlify site IDs
             return project.ProjectId;
         }
     } // ← This closes the UnifiedDeploymentController class

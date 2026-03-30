@@ -1,4 +1,4 @@
-﻿using System;
+using System;
 using System.Net.Http;
 using System.Net.Http.Headers;
 using System.Security.Cryptography;
@@ -95,9 +95,14 @@ namespace SwiftDeploy.Controllers
                 _logger.LogInformation($"Project name generated: {projectName}");
 
                 // ---------------------------------------------------------
-                // 3. Check existing projects to avoid repo_links_exceeded_limit
+                // 3. Check existing projects (SKIP if we ALREADY have a PlatformId)
                 // ---------------------------------------------------------
-                _logger.LogInformation("Checking existing projects for repository connection limit...");
+                string projectId = requestData.PlatformId;
+                string createBody = "{}";
+
+                if (string.IsNullOrWhiteSpace(projectId))
+                {
+                    _logger.LogInformation("Checking existing projects for repository connection limit...");
 
                 var projectsUrl = string.IsNullOrWhiteSpace(requestData.TeamId)
                                 ? $"{BaseApiUrl}/projects"
@@ -150,91 +155,100 @@ namespace SwiftDeploy.Controllers
                 // ---------------------------------------------------------
                 // 4. Create project payload
                 // ---------------------------------------------------------
-                _logger.LogInformation("Creating Vercel project...");
+                    _logger.LogInformation("Creating Vercel project...");
 
-                var createPayload = new
-                {
-                    name = projectName,
-                    framework = requestData.Framework == "static" ? null : requestData.Framework,
-                    buildCommand = string.IsNullOrWhiteSpace(requestData.BuildCommand) ? null : requestData.BuildCommand,
-                    outputDirectory = string.IsNullOrWhiteSpace(requestData.BuildDir) ? "public" : requestData.BuildDir,
-                    installCommand = string.IsNullOrWhiteSpace(requestData.InstallCommand) ? null : requestData.InstallCommand,
+                    var createPayload = new
+                    {
+                        name = projectName,
+                        framework = requestData.Framework == "static" ? null : requestData.Framework,
+                        buildCommand = string.IsNullOrWhiteSpace(requestData.BuildCommand) ? null : requestData.BuildCommand,
+                        outputDirectory = string.IsNullOrWhiteSpace(requestData.BuildDir) ? "public" : requestData.BuildDir,
+                        installCommand = string.IsNullOrWhiteSpace(requestData.InstallCommand) ? null : requestData.InstallCommand,
 
-                    gitRepository = new
+                        gitRepository = new
+                        {
+                            type = "github",
+                            repo = githubRepo
+                        },
+
+                        environmentVariables = requestData.EnvironmentVariables ?? new object[] { }
+                    };
+
+                    var createUrl = string.IsNullOrWhiteSpace(requestData.TeamId)
+                                    ? $"{BaseApiUrl}/projects"
+                                    : $"{BaseApiUrl}/projects?teamId={requestData.TeamId}";
+
+                    var createContent = new StringContent(JsonSerializer.Serialize(createPayload), Encoding.UTF8, "application/json");
+                    var createResponse = await client.PostAsync(createUrl, createContent);
+                    createBody = await createResponse.Content.ReadAsStringAsync();
+
+                    if (!createResponse.IsSuccessStatusCode)
+                    {
+                        // Log the raw Vercel API error so it appears in backend output
+                        _logger.LogError("❌ Vercel project creation failed. HTTP {Status}. Body: {Body}",
+                            (int)createResponse.StatusCode, createBody);
+
+                        // Parse error details
+                        try
+                        {
+                            var errorJson = JsonDocument.Parse(createBody);
+                            var errorCode = errorJson.RootElement.GetProperty("error").GetProperty("code").GetString();
+                            var errorMessage = errorJson.RootElement.GetProperty("error").GetProperty("message").GetString();
+
+                            return StatusCode((int)createResponse.StatusCode, new
+                            {
+                                success = false,
+                                error = "Project creation failed",
+                                code = errorCode,
+                                message = errorMessage,
+                                details = createBody
+                            });
+                        }
+                        catch
+                        {
+                            return StatusCode((int)createResponse.StatusCode, new
+                            {
+                                success = false,
+                                error = "Project creation failed",
+                                details = createBody
+                            });
+                        }
+                    }
+
+                    var projectJson = JsonDocument.Parse(createBody);
+                    projectId = projectJson.RootElement.GetProperty("id").GetString();
+
+                    _logger.LogInformation($"Project created successfully => ID: {projectId}");
+
+                    // ---------------------------------------------------------
+                    // 5. Link GitHub repo
+                    // ---------------------------------------------------------
+                    _logger.LogInformation("Linking GitHub repository...");
+
+                    var linkUrl = string.IsNullOrWhiteSpace(requestData.TeamId)
+                                  ? $"{BaseApiUrl}/projects/{projectId}/link"
+                                  : $"{BaseApiUrl}/projects/{projectId}/link?teamId={requestData.TeamId}";
+
+                    var linkPayload = new
                     {
                         type = "github",
-                        repo = githubRepo
-                    },
+                        repo = githubRepo,
+                        gitBranch = requestData.Branch
+                    };
 
-                    environmentVariables = requestData.EnvironmentVariables ?? new object[] { }
-                };
+                    var linkContent = new StringContent(JsonSerializer.Serialize(linkPayload), Encoding.UTF8, "application/json");
+                    var linkResponse = await client.PostAsync(linkUrl, linkContent);
+                    var linkBody = await linkResponse.Content.ReadAsStringAsync();
 
-                var createUrl = string.IsNullOrWhiteSpace(requestData.TeamId)
-                                ? $"{BaseApiUrl}/projects"
-                                : $"{BaseApiUrl}/projects?teamId={requestData.TeamId}";
-
-                var createContent = new StringContent(JsonSerializer.Serialize(createPayload), Encoding.UTF8, "application/json");
-                var createResponse = await client.PostAsync(createUrl, createContent);
-                var createBody = await createResponse.Content.ReadAsStringAsync();
-
-                if (!createResponse.IsSuccessStatusCode)
-                {
-                    // Parse error details
-                    try
-                    {
-                        var errorJson = JsonDocument.Parse(createBody);
-                        var errorCode = errorJson.RootElement.GetProperty("error").GetProperty("code").GetString();
-                        var errorMessage = errorJson.RootElement.GetProperty("error").GetProperty("message").GetString();
-
-                        return StatusCode((int)createResponse.StatusCode, new
-                        {
-                            success = false,
-                            error = "Project creation failed",
-                            code = errorCode,
-                            message = errorMessage,
-                            details = createBody
-                        });
-                    }
-                    catch
-                    {
-                        return StatusCode((int)createResponse.StatusCode, new
-                        {
-                            success = false,
-                            error = "Project creation failed",
-                            details = createBody
-                        });
-                    }
+                    if (!linkResponse.IsSuccessStatusCode)
+                        _logger.LogWarning($"GitHub linking failed (may already be linked): {linkBody}");
+                    else
+                        _logger.LogInformation("GitHub repository linked successfully.");
                 }
-
-                var projectJson = JsonDocument.Parse(createBody);
-                string projectId = projectJson.RootElement.GetProperty("id").GetString();
-
-                _logger.LogInformation($"Project created successfully => ID: {projectId}");
-
-                // ---------------------------------------------------------
-                // 5. Link GitHub repo
-                // ---------------------------------------------------------
-                _logger.LogInformation("Linking GitHub repository...");
-
-                var linkUrl = string.IsNullOrWhiteSpace(requestData.TeamId)
-                              ? $"{BaseApiUrl}/projects/{projectId}/link"
-                              : $"{BaseApiUrl}/projects/{projectId}/link?teamId={requestData.TeamId}";
-
-                var linkPayload = new
-                {
-                    type = "github",
-                    repo = githubRepo,
-                    gitBranch = requestData.Branch
-                };
-
-                var linkContent = new StringContent(JsonSerializer.Serialize(linkPayload), Encoding.UTF8, "application/json");
-                var linkResponse = await client.PostAsync(linkUrl, linkContent);
-                var linkBody = await linkResponse.Content.ReadAsStringAsync();
-
-                if (!linkResponse.IsSuccessStatusCode)
-                    _logger.LogWarning($"GitHub linking failed (may already be linked): {linkBody}");
                 else
-                    _logger.LogInformation("GitHub repository linked successfully.");
+                {
+                    _logger.LogInformation($"Using existing Vercel project ID: {projectId}");
+                }
 
                 // ---------------------------------------------------------
                 // 6. Trigger deployment manually
@@ -427,5 +441,6 @@ namespace SwiftDeploy.Controllers
         public string? Framework { get; set; }
         public string? TeamId { get; set; }
         public object[]? EnvironmentVariables { get; set; }
+        public string? PlatformId { get; set; }
     }
 }

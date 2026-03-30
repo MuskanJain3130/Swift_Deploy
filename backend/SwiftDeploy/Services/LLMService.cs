@@ -1,52 +1,52 @@
-﻿    using System.Net.Http.Headers;
-    using System.Text;
-    using System.Text.Json;
+﻿using System.Net.Http.Headers;
+using System.Text;
+using System.Text.Json;
 
-    namespace SwiftDeploy.Services
+namespace SwiftDeploy.Services
+{
+    public class LLMService
     {
-        public class LLMService
-        {
-        private readonly HttpClient _httpClient;
-        private readonly string _apiKey;
+    private readonly HttpClient _httpClient;
+    private readonly string _apiKey;
 
-        public LLMService(IConfiguration config)
-        {
-            _httpClient = new HttpClient();
+    public LLMService(IConfiguration config)
+    {
+        _httpClient = new HttpClient();
             _apiKey = config["OpenRouter:ApiKey"];
-        }
+    }
 
-        public async Task<string> GetPlatformSuggestion(string prompt)
+    public async Task<string> GetPlatformSuggestion(string prompt)
+    {
+        var requestBody = new
         {
-            var requestBody = new
+            model = "deepseek/deepseek-chat", // ✅ FREE MODEL
+            messages = new[]
             {
-                model = "deepseek/deepseek-chat", // ✅ FREE MODEL
-                messages = new[]
-                {
-                new { role = "user", content = prompt }
-            },
-                temperature = 0.2
-            };
+            new { role = "user", content = prompt }
+        },
+            temperature = 0.2
+        };
 
-            var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions");
+        var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions");
 
-            request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
-            request.Headers.Add("HTTP-Referer", "http://localhost:5000");
-            request.Headers.Add("X-Title", "SwiftDeploy");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "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");
+        request.Headers.Add("HTTP-Referer", "http://localhost:5000");
+        request.Headers.Add("X-Title", "SwiftDeploy");
 
-            request.Content = new StringContent(
-                JsonSerializer.Serialize(requestBody),
-                Encoding.UTF8,
-                "application/json"
-            );
+        request.Content = new StringContent(
+            JsonSerializer.Serialize(requestBody),
+            Encoding.UTF8,
+            "application/json"
+        );
 
-            var response = await _httpClient.SendAsync(request);
-            var responseString = await response.Content.ReadAsStringAsync();
+        var response = await _httpClient.SendAsync(request);
+        var responseString = await response.Content.ReadAsStringAsync();
 
-            Console.WriteLine("=== OPENROUTER RAW ===");
-            Console.WriteLine(responseString);
+        Console.WriteLine("=== OPENROUTER RAW ===");
+        Console.WriteLine(responseString);
 
-            return responseString;
-        }
+        return responseString;
     }
-    }
+}
+}
 

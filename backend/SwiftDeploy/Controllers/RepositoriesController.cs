@@ -304,58 +304,58 @@ namespace SwiftDeploy.Controllers
 
                 // ✅ Improved prompt
                 var prompt = $@"
-You are a senior DevOps architect.
+                    You are a senior DevOps architect.
 
-Analyze the project and provide:
+                    Analyze the project and provide:
 
-1. Best deployment platform
-2. Score for each platform
-3. Possible build failures
-4. Optimization suggestions
+                    1. Best deployment platform
+                    2. Score for each platform
+                    3. Possible build failures
+                    4. Optimization suggestions
 
-Project:
-Language: {analysis.Language}
-Frontend: {analysis.Framework}
-Backend: {analysis.BackendFramework}
-Build Tool: {analysis.BuildTool}
-Package Manager: {analysis.PackageManager}
+                    Project:
+                    Language: {analysis.Language}
+                    Frontend: {analysis.Framework}
+                    Backend: {analysis.BackendFramework}
+                    Build Tool: {analysis.BuildTool}
+                    Package Manager: {analysis.PackageManager}
 
-Features:
-Static: {analysis.IsStatic}
-SSR: {analysis.HasServerSideRendering}
-API: {analysis.HasApiRoutes}
-Database: {analysis.HasDatabase}
-Docker: {analysis.HasDocker}
-Technologies: {string.Join(", ", analysis.DetectedTechnologies ?? new List<string>())}
+                    Features:
+                    Static: {analysis.IsStatic}
+                    SSR: {analysis.HasServerSideRendering}
+                    API: {analysis.HasApiRoutes}
+                    Database: {analysis.HasDatabase}
+                    Docker: {analysis.HasDocker}
+                    Technologies: {string.Join(", ", analysis.DetectedTechnologies ?? new List<string>())}
 
-Platforms:
-- Vercel
-- Netlify
-- Cloudflare Pages
-- GitHub Pages
+                    Platforms:
+                    - Vercel
+                    - Netlify
+                    - Cloudflare Pages
+                    - GitHub Pages
 
-Rules:
-- SSR → Vercel preferred
-- Static → Netlify/Cloudflare preferred
-- API/Backend → avoid GitHub Pages
+                    Rules:
+                    - SSR → Vercel preferred
+                    - Static → Netlify/Cloudflare preferred
+                    - API/Backend → avoid GitHub Pages
 
-Return ONLY JSON:
-{{
-  ""recommendation"": ""string"",
-  ""suggestions"": [
-    {{
-      ""platform"": ""string"",
-      ""score"": number,
-      ""reason"": ""string""
-    }}
-  ],
-  ""buildRisks"": [
-    ""string""
-  ],
-  ""optimizations"": [
-    ""string""
-  ]
-}}";
+                    Return ONLY JSON:
+                    {{
+                      ""recommendation"": ""string"",
+                      ""suggestions"": [
+                        {{
+                          ""platform"": ""string"",
+                          ""score"": number,
+                          ""reason"": ""string""
+                        }}
+                      ],
+                      ""buildRisks"": [
+                        ""string""
+                      ],
+                      ""optimizations"": [
+                        ""string""
+                      ]
+                    }}";
 
                 // ✅ Call LLM
                 var llmRaw = await _llmService.GetPlatformSuggestion(prompt);

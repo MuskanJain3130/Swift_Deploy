@@ -1,4 +1,4 @@
-﻿// Services/UnifiedDeploymentService.cs
+// Services/UnifiedDeploymentService.cs
 using Azure.Storage.Blobs;
 using Microsoft.AspNetCore.Http;
 using MongoDB.Driver;
@@ -895,7 +895,8 @@ namespace SwiftDeploy.Services.Interfaces
         string branch,
         CommonConfig config,
         string vercelToken,
-        string githubToken)
+        string githubToken,
+        string platformId = null)
         {
             try
             {
@@ -997,7 +998,8 @@ namespace SwiftDeploy.Services.Interfaces
                     TeamId = string.IsNullOrWhiteSpace(config?.TeamId?.ToString()) ? "" : config.TeamId.ToString(),
                     EnvironmentVariables = config?.EnvironmentVariables?
                         .Select(kv => new { name = kv.Key, value = kv.Value })
-                        .ToArray() ?? Array.Empty<object>()
+                        .ToArray() ?? Array.Empty<object>(),
+                    PlatformId = platformId
                 };
 
                 // ⭐ STEP 3: Call internal Vercel controller

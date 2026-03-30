@@ -1,4 +1,4 @@
-﻿using Microsoft.AspNetCore.Authorization;
+using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Http;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
@@ -14,13 +14,15 @@ namespace SwiftDeploy.Controllers
     public class DeploymentsController : ControllerBase
     {
         private readonly IMongoCollection<Deployment> _deployments;
+        private readonly IMongoCollection<ScheduledDeployment> _scheduleddeployments;
         private readonly IMongoCollection<Project> _projects;
 
         public DeploymentsController(IMongoDatabase mongoDatabase)
             {
             _deployments = mongoDatabase.GetCollection<Deployment>("Deployments");
             _projects = mongoDatabase.GetCollection<Project>("Projects");
-           }
+            _scheduleddeployments= mongoDatabase.GetCollection<ScheduledDeployment>("scheduled_deployments");
+        }
             
     
             [HttpPost]
@@ -49,16 +51,19 @@ namespace SwiftDeploy.Controllers
                 return CreatedAtAction(nameof(GetDeploymentById), new { id = deployment.Id }, deployment);
             }
             [HttpPost("repo")]
-            public IActionResult GetDeploymentByUserId([FromBody] Dictionary<string, string> request)
+            public async Task<IActionResult> GetDeploymentsByRepoId([FromBody] Dictionary<string, string> request)
             {
                 if (request == null || !request.TryGetValue("repoId", out var repoId))
                     return BadRequest("repoId is required in the request body");
 
-                var deployment = _deployments.Find(d => d.RepoId == repoId).FirstOrDefault();
-                if (deployment == null)
-                    return NotFound();
+                var deployments = await _deployments.Find(d => d.RepoId == repoId)
+                                                    .SortByDescending(d => d.DeployedAt)
+                                                    .ToListAsync();
+                
+                if (deployments == null || deployments.Count == 0)
+                    return NotFound(new List<Deployment>());
 
-                return Ok(deployment);
+                return Ok(deployments);
             }
 
 
@@ -83,6 +88,12 @@ namespace SwiftDeploy.Controllers
         public IActionResult GetDeploymentById(string id)
         {
             var deployments = _deployments.Find(d => d.Id == id).FirstOrDefault();
+            return Ok(deployments);
+        }
+        [HttpGet("scheduled/{id}")]
+        public async Task<IActionResult> GetScheduledDeploymentByProjectId(string id)
+        {
+            var deployments = await _scheduleddeployments.Find(d => d.ProjectId == id).ToListAsync();
             return Ok(deployments);
         }
         public class DeploymentRequest
