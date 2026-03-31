@@ -29,7 +29,7 @@ namespace SwiftDeploy.Services
 
         var request = new HttpRequestMessage(HttpMethod.Post, "https://openrouter.ai/api/v1/chat/completions");
 
-        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", "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");
+        request.Headers.Authorization = new AuthenticationHeaderValue("Bearer", _apiKey);
         request.Headers.Add("HTTP-Referer", "http://localhost:5000");
         request.Headers.Add("X-Title", "SwiftDeploy");
 
