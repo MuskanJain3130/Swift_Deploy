@@ -198,7 +198,7 @@ namespace SwiftDeploy.Controllers
 
         [HttpPost("deploy-without-github")]
         [Authorize]
-        public async Task<IActionResult> DeployWithoutGitHub([FromForm] UploadProjectRequest request)
+        public async Task<IActionResult> DeployWithoutGitHub([FromBody] UploadProjectRequest request)
         {
             var projectId = Guid.NewGuid().ToString();
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
@@ -911,8 +911,62 @@ namespace SwiftDeploy.Controllers
         {
             try
             {
-                if (!_projects.TryGetValue(projectId, out var project))
-                    return NotFound("Project not found");
+                ProjectInfo project = null;
+                
+                // ⭐ STEP 1: Try in-memory dictionary first (for active deployments)
+                if (_projects.TryGetValue(projectId, out var memoryProject))
+                {
+                    project = memoryProject;
+                    _logger.LogInformation($"✅ Found project in memory: {projectId}");
+                }
+                // ⭐ STEP 2: If not in memory, look up from MongoDB
+                else
+                {
+                    _logger.LogInformation($"Project {projectId} not in memory, looking up from MongoDB...");
+                    
+                    // Get MongoDB collections
+                    var projectsCollection = _deploymentsCollection.Database.GetCollection<Models.Project>("Projects");
+                    var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+                    
+                    if (string.IsNullOrEmpty(userId))
+                        return Unauthorized("Invalid token");
+                    
+                    // Try to find project by ID
+                    var mongoProject = await projectsCollection.Find(p => p.Id == projectId && p.UserId == userId).FirstOrDefaultAsync();
+                    
+                    if (mongoProject == null)
+                    {
+                        _logger.LogWarning($"Project {projectId} not found in MongoDB");
+                        return NotFound("Project not found");
+                    }
+                    
+                    _logger.LogInformation($"✅ Found project in MongoDB: {mongoProject.ProjectName}, RepoId: {mongoProject.RepoId}");
+                    
+                    // Get latest deployment for this repo to get platform and repo info
+                    var latestDeployment = await _deploymentsCollection
+                        .Find(d => d.RepoId == mongoProject.RepoId && d.UserId == userId)
+                        .SortByDescending(d => d.DeployedAt)
+                        .FirstOrDefaultAsync();
+                    
+                    if (latestDeployment == null)
+                    {
+                        _logger.LogWarning($"No deployment found for repo {mongoProject.RepoId}");
+                        return NotFound("No deployment found for this project. Please deploy the project first.");
+                    }
+                    
+                    _logger.LogInformation($"✅ Found latest deployment: Platform={latestDeployment.Platform}, RepoId={latestDeployment.RepoId}");
+                    
+                    // Reconstruct ProjectInfo from MongoDB data
+                    project = new ProjectInfo
+                    {
+                        ProjectId = projectId,
+                        ProjectName = mongoProject.ProjectName,
+                        Platform = latestDeployment.Platform,
+                        GitHubRepoName = latestDeployment.RepoId,
+                        GitHubRepoUrl = latestDeployment.GitHubRepoUrl ?? $"https://github.com/{latestDeployment.RepoId}",
+                        Config = newConfig
+                    };
+                }
 
                 // Update project config
                 project.Config = newConfig;
@@ -924,8 +978,17 @@ namespace SwiftDeploy.Controllers
 
                 // Push updated config to repo
                 var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
+                
+                // Extract repo name from GitHubRepoName (format: owner/repo)
+                var repoName = project.GitHubRepoName?.Split('/').LastOrDefault() ?? project.GitHubRepoName;
+                
+                if (string.IsNullOrEmpty(repoName))
+                {
+                    return BadRequest("GitHub repository name not found");
+                }
+                
                 var configResult = await gitHubService.SaveFileToRepoAsync(
-                    project.GitHubRepoName,
+                    repoName,
                     fileName,
                     configContent,
                     "Update configuration via SwiftDeploy",
