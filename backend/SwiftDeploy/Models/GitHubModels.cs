@@ -1,4 +1,4 @@
-﻿using System.ComponentModel.DataAnnotations;
+using System.ComponentModel.DataAnnotations;
 
 namespace SwiftDeploy.Models
 {
@@ -71,6 +71,9 @@ namespace SwiftDeploy.Models
         public string Platform { get; set; }
 
         [Required]
+        public string ProjectId { get; set; }
+
+        [Required]
         [RegularExpression(@"^[a-zA-Z0-9_.-]+/[a-zA-Z0-9_.-]+$",
             ErrorMessage = "GitHub repository must be in format 'owner/repo'")]
         public string GitHubRepo { get; set; }
@@ -79,6 +82,8 @@ namespace SwiftDeploy.Models
 
         [Required]
         public CommonConfig Config { get; set; }
+
+        public string? PlatformId { get; set; } 
     }
 
     public enum DeploymentStatus

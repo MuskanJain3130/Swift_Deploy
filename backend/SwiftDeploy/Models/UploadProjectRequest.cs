@@ -7,6 +7,7 @@ namespace SwiftDeploy.Models
     {
         [Required]
         public string ProjectName { get; set; }
+        public string RepoName { get; set; }
 
         public string Description { get; set; }
 
@@ -14,7 +15,8 @@ namespace SwiftDeploy.Models
         public string Platform { get; set; }
 
         // ⭐ Changed: Now accepts either IFormFile OR Azure blob name
-        //public IFormFile ProjectZip { get; set; }  // Optional now
+        public String ZipPath { get; set; }  // Optional now
+        public IFormFile ProjectZip { get; set; }  // Optional now
 
         public string AzureBlobName { get; set; }  // ⭐ NEW: Azure blob name
 

@@ -19,6 +19,7 @@
     <PackageReference Include="MongoDB.Driver.Core" Version="2.30.0" />
     <PackageReference Include="Octokit" Version="14.0.0" />
     <PackageReference Include="Swashbuckle.AspNetCore" Version="6.4.0" />
+    <PackageReference Include="System.Net.Http.Json" Version="10.0.5" />
   </ItemGroup>
 
 </Project>

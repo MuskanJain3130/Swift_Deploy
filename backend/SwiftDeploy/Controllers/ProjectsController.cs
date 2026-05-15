@@ -1,8 +1,10 @@
 ﻿using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
 using MongoDB.Driver;
+using Octokit;
 using SwiftDeploy.Models;
 using System.Collections.Generic;
+using Project = SwiftDeploy.Models.Project;
 
 namespace SwiftDeploy.Controllers
 {
@@ -12,10 +14,12 @@ namespace SwiftDeploy.Controllers
     public class ProjectsController : ControllerBase
     {
         private readonly IMongoCollection<Project> _Projects;
+        private readonly IUnifiedDeploymentService _deploymentService;
 
-        public ProjectsController(IMongoDatabase mongoDatabase)
+        public ProjectsController(IMongoDatabase mongoDatabase, IUnifiedDeploymentService deploymentService)
         {
             _Projects = mongoDatabase.GetCollection<Project>("Projects");
+            _deploymentService = deploymentService;
         }
 
         [HttpPost]
@@ -30,6 +34,49 @@ namespace SwiftDeploy.Controllers
                 ProjectName = body.ContainsKey("projectName") ? body["projectName"]?.ToString() : null,
                 RepoId = body.ContainsKey("repoId") ? body["repoId"]?.ToString() : null,
                 Branch = body.ContainsKey("branch") ? body["branch"]?.ToString() : null,
+                CreatedAt = DateTime.UtcNow
+            };
+
+            _Projects.InsertOne(project);
+
+            return CreatedAtAction(nameof(GetProjectById), new { id = project.Id }, project);
+        }
+
+        [HttpPost("new-without-github-project")]
+        public async Task<IActionResult> CreateWithoutGithubProject([FromBody] Dictionary<string, object> body)
+        {
+            if (body == null)
+                return BadRequest("Project data is required");
+
+
+            string projectName = body.ContainsKey("projectName") ? body["projectName"]?.ToString() : null;
+
+            string bloburl = body.ContainsKey("bloburl") ? body["bloburl"]?.ToString() : null;
+            var localProjectPath = await _deploymentService.DownloadAndExtractFromAzureAsync(bloburl,projectName);
+            
+            var repoName = await _deploymentService.CreateSwiftDeployRepoAsync(projectName, "generated from swift deploy");
+            var GitHubRepoName = repoName;
+
+            await _deploymentService.PushCodeToSwiftDeployRepoAsync(repoName, localProjectPath);
+
+            // ⭐ Cleanup: Delete extracted folder after pushing to GitHub
+            try
+            {
+                if (Directory.Exists(localProjectPath))
+                {
+                    Directory.Delete(localProjectPath, true);
+                }
+            }
+            catch (Exception cleanupEx)
+            {
+            }
+
+            Models.Project project = new Models.Project
+            {
+                UserId = body.ContainsKey("userId") ? body["userId"]?.ToString() : null,
+                ProjectName = projectName,
+                RepoId =  "swiftdeployapp/"+repoName,
+                Branch = "main",
                 CreatedAt = DateTime.UtcNow
             };
 

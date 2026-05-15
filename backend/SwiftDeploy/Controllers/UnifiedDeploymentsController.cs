@@ -1,6 +1,7 @@
-﻿// Controllers/UnifiedDeploymentController.cs
+// Controllers/UnifiedDeploymentController.cs
 using Microsoft.AspNetCore.Authorization;
 using Microsoft.AspNetCore.Mvc;
+using MongoDB.Bson;
 using MongoDB.Driver;
 using Octokit;
 using SwiftDeploy.Models;
@@ -12,6 +13,8 @@ using System.Text;
 using System.Text.Json;
 using Deployment = SwiftDeploy.Models.Deployment;
 using DeploymentStatus = SwiftDeploy.Models.DeploymentStatus;
+using MongoDB.Bson;
+
 namespace SwiftDeploy.Controllers
 {
     [ApiController]
@@ -19,6 +22,7 @@ namespace SwiftDeploy.Controllers
     [Authorize]
     public class UnifiedDeploymentController : ControllerBase
     {
+        private readonly IMongoCollection<ScheduledDeployment> _scheduledCollection;
         private readonly IUnifiedDeploymentService _deploymentService;
         private readonly ITemplateEngine _templateEngine;
         private readonly ILogger<UnifiedDeploymentController> _logger;
@@ -27,23 +31,26 @@ namespace SwiftDeploy.Controllers
         private readonly IHttpContextAccessor _httpContextAccessor;
         private readonly TokenService _tokenService;
         private readonly IMongoCollection<Deployment> _deploymentsCollection;
-
+        private readonly IMongoCollection<SwiftDeploy.Models.Project> _projectsCollection;
         public UnifiedDeploymentController(
             IUnifiedDeploymentService deploymentService,
             ITemplateEngine templateEngine,
             IConfiguration configuration,
             TokenService tokenService,
             ILogger<UnifiedDeploymentController> logger,
-            IHttpContextAccessor httpContextAccessor,
-            IMongoDatabase mongoDatabase)
+                IHttpContextAccessor httpContextAccessor , IMongoDatabase db// ADD THIS
+)
         {
             _deploymentService = deploymentService;
             _templateEngine = templateEngine;
             _configuration = configuration;
             _tokenService = tokenService;
-            _logger = logger;
+            _logger = logger; 
+            _scheduledCollection = db.GetCollection<ScheduledDeployment>("scheduled_deployments");
+
             _httpContextAccessor = httpContextAccessor;
-            _deploymentsCollection = mongoDatabase.GetCollection<Deployment>("Deployments");
+            _deploymentsCollection = db.GetCollection<Deployment>("Deployments");
+            _projectsCollection = db.GetCollection<SwiftDeploy.Models.Project>("Projects");
         }
 
         //[HttpPost("deploy-without-github")]
@@ -202,7 +209,7 @@ namespace SwiftDeploy.Controllers
         {
             var projectId = Guid.NewGuid().ToString();
             var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
-            string localProjectPath = null;
+            //string localProjectPath = null;
 
             try
             {
@@ -249,48 +256,23 @@ namespace SwiftDeploy.Controllers
 
                 // ⭐ Step 1: Upload/Download and extract project
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Processing, "Extracting project files...");
-
-                if (!string.IsNullOrWhiteSpace(request.AzureBlobName))
-                {
-                    // ⭐ Download from Azure Blob Storage
-                    _logger.LogInformation($"Downloading project from Azure blob: {request.AzureBlobName}");
-                    localProjectPath = await _deploymentService.DownloadAndExtractFromAzureAsync(request.AzureBlobName, request.ProjectName);
-                }
-                //else
-                //{
-                //    // Upload from form file (existing logic)
-                //    _logger.LogInformation($"Uploading project from form file");
-                //    localProjectPath = await _deploymentService.UploadAndExtractProjectAsync(request.ProjectZip, request.ProjectName);
-                //}
+                var localProjectPath = await _deploymentService.UploadAndExtractProjectAsync(request.ZipPath, request.ProjectName);
 
                 // Step 2: Create GitHub repo on SwiftDeploy account
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.CreatingRepo, "Creating GitHub repository...");
                 var repoName = await _deploymentService.CreateSwiftDeployRepoAsync(request.ProjectName, request.Description);
                 projectInfo.GitHubRepoName = repoName;
-                projectInfo.GitHubRepoUrl = $"https://github.com/swiftdeployapp/{repoName}";
+                projectInfo.GitHubRepoUrl = $"https://github.com/swiftdeploy-repos/{repoName}";
 
                 // Step 3: Push code to repo
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.PushingCode, "Pushing code to repository...");
                 await _deploymentService.PushCodeToSwiftDeployRepoAsync(repoName, localProjectPath);
 
-                // ⭐ Cleanup: Delete extracted folder after pushing to GitHub
-                try
-                {
-                    if (Directory.Exists(localProjectPath))
-                    {
-                        Directory.Delete(localProjectPath, true);
-                        _logger.LogInformation($"Deleted extracted project folder: {localProjectPath}");
-                    }
-                }
-                catch (Exception cleanupEx)
-                {
-                    _logger.LogWarning(cleanupEx, $"Failed to cleanup extracted folder: {localProjectPath}");
-                    // Don't fail the deployment for cleanup errors
-                }
-
                 // Step 4: Generate and push config
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating deployment configuration...");
-                await _deploymentService.PushConfigToRepoAsync(repoName, request.Platform, request.Config);
+                string reponame = request.RepoName.Split("/")[1];
+
+                await _deploymentService.PushConfigToRepoAsync(reponame, request.Platform, request.Config);
 
                 // Step 5: Deploy to platform
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Deploying, $"Deploying to {request.Platform}...");
@@ -311,7 +293,7 @@ namespace SwiftDeploy.Controllers
                     var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
                     var configResult = await gitHubService.GenerateAndSaveConfigAsync(
                         request.Platform,
-                        "swiftdeployapp/"+repoName,
+                        request.RepoName,
                         _configuration["SwiftDeploy:GitHubToken"],
                         "main",
                         request.Config
@@ -342,9 +324,11 @@ namespace SwiftDeploy.Controllers
 
                 DeploymentResponse deploymentResult = request.Platform.ToLower() switch
                 {
-                    "cloudflare" => await DeployToCloudflareWithUserRepo("swiftdeployapp/"+repoName, "main", request.Config, platformToken, _configuration["SwiftDeploy:GitHubToken"]),
-                    "netlify" => await _deploymentService.DeployToNetlifyAsync(repoName, "main", request.Config, userId, platformToken),
-                    "vercel" => await DeployToVercelWithUserRepo("swiftdeployapp/"+repoName, "main", request.Config, platformToken, _configuration["SwiftDeploy:GitHubToken"]),
+                    "cloudflare" => await DeployToCloudflareWithUserRepo(request.RepoName, "main", request.Config, platformToken, _configuration["SwiftDeploy:GitHubToken"]),
+                    "netlify" => await _deploymentService.DeployToNetlifyAsync(request.RepoName,
+ "main", request.Config, userId, platformToken),
+                    "vercel" => await DeployToVercelWithUserRepo(request.RepoName,
+ "main", request.Config, platformToken, _configuration["SwiftDeploy:GitHubToken"]),
                     _ => throw new ArgumentException($"Unsupported platform: {request.Platform}")
                 };
 
@@ -404,15 +388,15 @@ namespace SwiftDeploy.Controllers
                 await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, ex.Message);
 
                 // ⭐ Cleanup on error
-                try
-                {
-                    if (!string.IsNullOrEmpty(localProjectPath) && Directory.Exists(localProjectPath))
-                    {
-                        Directory.Delete(localProjectPath, true);
-                        _logger.LogInformation($"Cleaned up extracted folder after error: {localProjectPath}");
-                    }
-                }
-                catch { /* Ignore cleanup errors */ }
+                //try
+                //{
+                //    if (!string.IsNullOrEmpty(localProjectPath) && Directory.Exists(localProjectPath))
+                //    {
+                //        Directory.Delete(localProjectPath, true);
+                //        _logger.LogInformation($"Cleaned up extracted folder after error: {localProjectPath}");
+                //    }
+                //}
+                //catch { /* Ignore cleanup errors */ }
 
                 // Save error deployment to MongoDB
                 try
@@ -506,11 +490,126 @@ namespace SwiftDeploy.Controllers
                 _ => "Unknown"
             };
         }
-        [HttpPost("deploy-with-github")]
+        private string ExtractPlatform(object payload)
+        {
+            var json = JsonSerializer.Serialize(payload);
+            using var doc = JsonDocument.Parse(json);
+
+            if (doc.RootElement.TryGetProperty("platform", out var platform))
+                return platform.GetString();
+
+            return "unknown";
+        }
+            [HttpPost("schedule-upload")]
+            public async Task<IActionResult> ScheduleUploadDeployment(
+        [FromBody] UploadProjectRequest request,
+        [FromQuery] DateTime scheduledTime)
+            {
+                try
+                {
+                    var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                    if (string.IsNullOrEmpty(userId))
+                        return Unauthorized("Invalid user");
+
+                    if (request == null)
+                        return BadRequest("Invalid request payload");
+
+                    if (string.IsNullOrEmpty(request.ZipPath))
+                        return BadRequest("ZipPath is required for scheduled deployments");
+
+                    if (scheduledTime <= DateTime.UtcNow)
+                        return BadRequest("Scheduled time must be in the future");
+
+                    var scheduled = new ScheduledDeployment
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        ProjectId = Guid.NewGuid().ToString(),
+                        UserId = userId,
+                        DeploymentType = "upload",
+                        Platform = request.Platform?.ToLower(),
+                        ScheduledTime = scheduledTime,
+                        PayloadJson = JsonSerializer.Serialize(request),
+                        Status = "Pending",
+                        IsExecuted = false,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _scheduledCollection.InsertOneAsync(scheduled);
+
+                    _logger.LogInformation($"📅 Upload deployment scheduled: {scheduled.Id}");
+
+                    return Ok(new
+                    {
+                        message = "Upload deployment scheduled successfully",
+                        scheduleId = scheduled.Id,
+                        scheduledTime = scheduledTime
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error scheduling upload deployment");
+                    return StatusCode(500, "Error scheduling deployment");
+                }
+            }
+
+            [HttpPost("schedule-github")]
+            public async Task<IActionResult> ScheduleGitHubDeployment(
+             [FromBody] GitHubDeployRequest request,
+             [FromQuery] DateTime scheduledTime)
+            {
+                try
+                {
+                    var userId = User.FindFirst(ClaimTypes.NameIdentifier)?.Value;
+
+                    if (string.IsNullOrEmpty(userId))
+                        return Unauthorized("Invalid user");
+
+                    if (request == null)
+                        return BadRequest("Invalid request payload");
+
+                    if (string.IsNullOrEmpty(request.GitHubRepo))
+                        return BadRequest("GitHub repository is required");
+
+                    if (scheduledTime <= DateTime.UtcNow)
+                        return BadRequest("Scheduled time must be in the future");
+
+                    var scheduled = new ScheduledDeployment
+                    {
+                        Id = ObjectId.GenerateNewId().ToString(),
+                        ProjectId =request.ProjectId,
+                        PlatformProjectId = request.PlatformId,
+                        UserId = userId,
+                        DeploymentType = "github",
+                        Platform = request.Platform?.ToLower(),
+                        ScheduledTime = scheduledTime,
+                        PayloadJson = JsonSerializer.Serialize(request),
+                        Status = "Pending",
+                        IsExecuted = false,
+                        CreatedAt = DateTime.UtcNow
+                    };
+
+                    await _scheduledCollection.InsertOneAsync(scheduled);
+
+                    _logger.LogInformation($"📅 GitHub deployment scheduled: {scheduled.Id}");
+
+                    return Ok(new
+                    {
+                        message = "GitHub deployment scheduled successfully",
+                        scheduleId = scheduled.Id,
+                        scheduledTime = scheduledTime
+                    });
+                }
+                catch (Exception ex)
+                {
+                    _logger.LogError(ex, "Error scheduling GitHub deployment");
+                    return StatusCode(500, "Error scheduling deployment");
+                }
+            }
+
+            [HttpPost("deploy-with-github")]
         public async Task<IActionResult> DeployWithGitHub([FromBody] GitHubDeployRequest request)
         {
-            var projectId = Guid.NewGuid().ToString();
-
             try
             {
                 if (!ModelState.IsValid)
@@ -520,40 +619,50 @@ namespace SwiftDeploy.Controllers
                 if (!supportedPlatforms.Contains(request.Platform.ToLower()))
                     return BadRequest($"Unsupported platform: {request.Platform}");
 
-                // Get GitHub token from database
-                var githubToken = await ((UnifiedDeploymentService)_deploymentService).GetGitHubTokenForUserAsync(request.UserId);
+                // Get GitHub token
+                var githubToken = await ((UnifiedDeploymentService)_deploymentService)
+                    .GetGitHubTokenForUserAsync(request.UserId);
 
                 if (string.IsNullOrEmpty(githubToken))
                 {
                     return BadRequest(new
                     {
                         success = false,
-                        message = "GitHub token not found in database. Please connect your GitHub account first.",
-                        platform = "github",
-                        userId = request.UserId
+                        message = "GitHub token not found. Please connect your GitHub account."
                     });
                 }
 
-                _logger.LogInformation($"✅ GitHub token retrieved from database (length: {githubToken.Length})");
-
-                // Get platform token (skip for GitHub Pages)
                 string platformToken = null;
                 if (request.Platform.ToLower() != "githubpages")
                 {
-                    platformToken = await _tokenService.GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
+                    platformToken = await _tokenService
+                        .GetPlatformTokenAsync(request.UserId, request.Platform, HttpContext);
+
                     if (string.IsNullOrEmpty(platformToken))
                     {
                         return BadRequest(new
                         {
                             success = false,
-                            message = $"No {request.Platform} token found. Please connect your {request.Platform} account.",
-                            platform = request.Platform,
-                            userId = request.UserId
+                            message = $"No {request.Platform} token found."
                         });
                     }
                 }
 
-                // Initialize project tracking
+                // ⭐ STEP 1: SAVE PROJECT FIRST
+                var project = new SwiftDeploy.Models.Project
+                {
+                    UserId = request.UserId,
+                    ProjectName = request.ProjectName,
+                    RepoId = request.GitHubRepo,
+                    Branch = request.Branch ?? "main",
+                    CreatedAt = DateTime.UtcNow
+                };
+
+                await _projectsCollection.InsertOneAsync(project);
+
+                var projectId = project.Id;   // ✅ USE MONGO ID
+
+                // ⭐ STEP 2: TRACK PROJECT (memory)
                 var projectInfo = new ProjectInfo
                 {
                     ProjectId = projectId,
@@ -566,18 +675,18 @@ namespace SwiftDeploy.Controllers
                     GitHubRepoName = request.GitHubRepo,
                     GitHubRepoUrl = $"https://github.com/{request.GitHubRepo}"
                 };
+
                 _projects[projectId] = projectInfo;
 
-                _logger.LogInformation($"Starting GitHub deployment for {request.GitHubRepo} on {request.Platform}");
+                _logger.LogInformation($"Starting deployment for {request.GitHubRepo}");
 
-                // Step 1: Generate and save config (skip for GitHub Pages)
+                // ⭐ STEP 3: Generate config
                 string configFileUrl = null;
 
                 if (request.Platform.ToLower() != "githubpages")
                 {
-                    await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.GeneratingConfig, "Generating and saving configuration...");
-
                     var gitHubService = HttpContext.RequestServices.GetRequiredService<IGitHubService>();
+
                     var configResult = await gitHubService.GenerateAndSaveConfigAsync(
                         request.Platform,
                         request.GitHubRepo,
@@ -588,48 +697,29 @@ namespace SwiftDeploy.Controllers
 
                     if (!configResult.Success)
                     {
-                        await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed,
-                            $"Failed to save config: {configResult.Message}");
-
                         return BadRequest(new
                         {
                             success = false,
-                            message = $"Failed to save config to GitHub: {configResult.Message}",
-                            projectId = projectId,
-                            gitHubRepoUrl = projectInfo.GitHubRepoUrl,
-                            status = (int)DeploymentStatus.Failed
+                            message = configResult.Message
                         });
                     }
 
                     configFileUrl = configResult.FileUrl;
-                    _logger.LogInformation($"✅ Config file saved: {configFileUrl}");
-                }
-                else
-                {
-                    _logger.LogInformation("Skipping config generation for GitHub Pages");
                 }
 
-                // Step 2: Deploy to platform
-                await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Deploying, $"Deploying to {request.Platform}...");
-
+                // ⭐ STEP 4: DEPLOY
                 DeploymentResponse deploymentResult = request.Platform.ToLower() switch
                 {
                     "cloudflare" => await DeployToCloudflareWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, githubToken),
                     "netlify" => await DeployToNetlifyWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, githubToken),
                     "vercel" => await DeployToVercelWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, platformToken, githubToken),
                     "githubpages" => await DeployToGitHubPagesWithUserRepo(request.GitHubRepo, request.Branch ?? "main", request.Config, githubToken),
-                    _ => throw new ArgumentException($"Unsupported platform: {request.Platform}")
+                    _ => throw new ArgumentException($"Unsupported platform")
                 };
 
                 if (deploymentResult.Success)
                 {
-                    await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Completed, "Deployment completed successfully!");
-                    projectInfo.DeploymentUrl = deploymentResult.DeploymentUrl;
-                    projectInfo.Status = DeploymentStatus.Completed;
-
-                    _logger.LogInformation($"✅ Deployment completed: {deploymentResult.DeploymentUrl}");
-
-                    // ⭐ Save deployment to MongoDB
+                    // ⭐ STEP 5: SAVE DEPLOYMENT (FIXED)
                     var mongoDeployment = new Deployment
                     {
                         UserId = request.UserId,
@@ -642,84 +732,36 @@ namespace SwiftDeploy.Controllers
                         DeployedAt = DateTime.UtcNow,
                         PlatformProjectId = deploymentResult.PlatformProjectId,
                         PlatformProjectName = deploymentResult.PlatformProjectName,
-                        InternalProjectId = projectId
+                        InternalProjectId = request.ProjectId   // ✅ FIXED (NO GUID)
                     };
-                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
-                    _logger.LogInformation($"✅ Deployment saved to MongoDB: {mongoDeployment.Id}");
 
-                    // ⭐ Return consistent response format
+                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
+
                     return Ok(new
                     {
                         success = true,
-                        message = deploymentResult.Message,
                         projectId = projectId,
                         deploymentId = mongoDeployment.Id,
-                        gitHubRepoUrl = projectInfo.GitHubRepoUrl,
-                        deploymentUrl = deploymentResult.DeploymentUrl,
-                        configFileUrl = configFileUrl,
-                        PlatformProjectId = deploymentResult.PlatformProjectId,
-                        PlatformProjectName = deploymentResult.PlatformProjectName,
-                        status = (int)DeploymentStatus.Completed,
-                        progress = 100,
-                        currentStep = "Completed"
+                        deploymentUrl = deploymentResult.DeploymentUrl
                     });
                 }
                 else
                 {
-                    await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, deploymentResult.Message);
-                    projectInfo.Status = DeploymentStatus.Failed;
-
-                    _logger.LogError($"❌ Deployment failed: {deploymentResult.Message}");
-
-                    // ⭐ Save failed deployment to MongoDB
-                    var mongoDeployment = new Deployment
-                    {
-                        UserId = request.UserId,
-                        Platform = request.Platform.ToLower(),
-                        RepoId = request.GitHubRepo,
-                        GitHubRepoUrl = projectInfo.GitHubRepoUrl,
-                        Status = "failed",
-                        DeployedAt = DateTime.UtcNow
-                    };
-                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
-
                     return BadRequest(new
                     {
                         success = false,
-                        message = deploymentResult.Message,
-                        projectId = projectId,
-                        deploymentId = mongoDeployment.Id,
-                        gitHubRepoUrl = projectInfo.GitHubRepoUrl,
-                        status = (int)DeploymentStatus.Failed
+                        message = deploymentResult.Message
                     });
                 }
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"GitHub deployment failed for {request.GitHubRepo}");
-                await _deploymentService.UpdateProjectStatusAsync(projectId, DeploymentStatus.Failed, ex.Message);
-
-                // ⭐ Save error deployment to MongoDB
-                try
-                {
-                    var mongoDeployment = new Deployment
-                    {
-                        UserId = request.UserId,
-                        Platform = request.Platform.ToLower(),
-                        RepoId = request.GitHubRepo,
-                        Status = "failed",
-                        DeployedAt = DateTime.UtcNow
-                    };
-                    await _deploymentsCollection.InsertOneAsync(mongoDeployment);
-                }
-                catch { /* Ignore MongoDB errors in catch block */ }
+                _logger.LogError(ex, "Deployment failed");
 
                 return StatusCode(500, new
                 {
                     success = false,
-                    message = $"Deployment failed: {ex.Message}",
-                    projectId = projectId,
-                    status = (int)DeploymentStatus.Failed
+                    message = ex.Message
                 });
             }
         }
@@ -886,26 +928,42 @@ namespace SwiftDeploy.Controllers
         {
             try
             {
-                if (!_projects.TryGetValue(projectId, out var project))
+                _logger.LogInformation($"Deleting project: {projectId}");
+
+
+                // ⭐ STEP 1: Find related deployments
+                var deployments = await _deploymentsCollection
+                    .Find(d => d.InternalProjectId == projectId)
+                    .ToListAsync();
+
+                _logger.LogInformation($"Found {deployments.Count} deployments");
+
+                // ⭐ STEP 2: Delete each deployment (FULL deletion)
+                foreach (var deployment in deployments)
+                {
+                    await DeleteDeployment(deployment.Id); // reuse your existing logic
+                }
+
+                // ⭐ STEP 3: Delete project
+                var projectResult = await _projectsCollection.DeleteOneAsync(p => p.Id == projectId);
+
+                if (projectResult.DeletedCount == 0)
+                {
                     return NotFound("Project not found");
+                }
 
-                // Remove from tracking
-                _projects.TryRemove(projectId, out _);
-
-                // Optional: Clean up files (implement based on your storage strategy)
-                // await CleanupProjectFiles(project);
-
-                _logger.LogInformation($"Project {projectId} deleted successfully");
-
-                return Ok(new { message = "Project deleted successfully" });
+                return Ok(new
+                {
+                    success = true,
+                    message = "Project and all deployments deleted"
+                });
             }
             catch (Exception ex)
             {
-                _logger.LogError(ex, $"Error deleting project {projectId}");
+                _logger.LogError(ex, "Error deleting project");
                 return StatusCode(500, "Error deleting project");
             }
         }
-
         [HttpPost("regenerate-config/{projectId}")]
         public async Task<IActionResult> RegenerateConfig(string projectId, [FromBody] CommonConfig newConfig)
         {
@@ -1180,7 +1238,7 @@ namespace SwiftDeploy.Controllers
                     subdomainProp.ValueKind != JsonValueKind.Null)
                 {
                     subdomain = subdomainProp.GetString();
-                    deploymentUrl = $"https://{subdomain}";
+                    deploymentUrl = $"https://{subdomain}.pages.dev";
                 }
 
                 // ⭐ Extract project ID (Cloudflare uses project name as ID)
@@ -1242,6 +1300,7 @@ namespace SwiftDeploy.Controllers
                                     {
                                         specificDeploymentUrl = $"https://{specificDeploymentUrl}";
                                     }
+                                    deploymentUrl = specificDeploymentUrl;
                                     _logger.LogInformation($"✅ Updated deployment URL from deployment response: {deploymentUrl}");
                                 }
                             }
@@ -1972,7 +2031,7 @@ namespace SwiftDeploy.Controllers
                 });
             }
         }
-        // ⭐ Direct deletion using platform project ID
+        // ⭐ Direct deletion using platform project IDh
         private async Task<DeploymentResponse> DeleteVercelProjectById(string vercelProjectId, string vercelToken)
         {
             try
@@ -2843,7 +2902,7 @@ namespace SwiftDeploy.Controllers
                 }
             }
 
-            // If ProjectId was stored as Netlify site ID
+            // If ProjectId was stored as Netlify site IDs
             return project.ProjectId;
         }
     } // ← This closes the UnifiedDeploymentController class

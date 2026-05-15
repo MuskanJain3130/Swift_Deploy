@@ -4,7 +4,7 @@ obj/
 [Bb]uild/
 [Ll]og/
 artifacts/
-
+appsettings.json
 ## User-specific files
 *.suo
 *.user
@@ -55,3 +55,4 @@ project.fragment.lock.json
 *.orig
 _ReSharper*/
 *.DotSettings.user
+appsettings.json
