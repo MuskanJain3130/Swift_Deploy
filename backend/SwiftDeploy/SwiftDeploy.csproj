@@ -22,4 +22,6 @@
     <PackageReference Include="System.Net.Http.Json" Version="10.0.5" />
   </ItemGroup>
 
+  <ProjectExtensions><VisualStudio><UserProperties appsettings_1json__JsonSchema="" /></VisualStudio></ProjectExtensions>
+
 </Project>

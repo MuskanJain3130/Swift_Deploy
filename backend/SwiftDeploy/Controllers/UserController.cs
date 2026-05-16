@@ -284,7 +284,6 @@ namespace SwiftDeploy.Controllers
             return Ok(new { success = true, message = "Profile completed successfully" });
         }
 
-
         [HttpGet("{userId}/all-tokens")]
         public IActionResult GetUserTokens(string userId)
         {
@@ -295,6 +294,12 @@ namespace SwiftDeploy.Controllers
             return Ok(new
             {
                 userId = tokens.UserId,
+                // Return the actual token strings
+                netlifyToken = tokens.NetlifyToken,
+                vercelToken = tokens.VercelToken,
+                cloudflareToken = tokens.CloudflareToken,
+                githubToken = tokens.GitHubToken,
+                // Keep the booleans for compatibility with other parts of the app
                 hasNetlifyToken = !string.IsNullOrEmpty(tokens.NetlifyToken),
                 hasVercelToken = !string.IsNullOrEmpty(tokens.VercelToken),
                 hasCloudflareToken = !string.IsNullOrEmpty(tokens.CloudflareToken),
